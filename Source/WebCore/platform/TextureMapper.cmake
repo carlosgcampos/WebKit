@@ -60,24 +60,26 @@ if (USE_COORDINATED_GRAPHICS)
         platform/graphics/texmap/coordinated/CoordinatedBackingStore.cpp
         platform/graphics/texmap/coordinated/CoordinatedBackingStoreProxy.cpp
         platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.cpp
-        platform/graphics/texmap/coordinated/CoordinatedGraphicsLayer.cpp
         platform/graphics/texmap/coordinated/CoordinatedImageBackingStore.cpp
+        platform/graphics/texmap/coordinated/CoordinatedPlatformLayer.cpp
         platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferExternalOES.cpp
         platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferHolePunch.cpp
         platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferNativeImage.cpp
         platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferRGB.cpp
         platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferYUV.cpp
         platform/graphics/texmap/coordinated/CoordinatedTileBuffer.cpp
+        platform/graphics/texmap/coordinated/GraphicsLayerCoordinated.cpp
     )
     list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
         platform/graphics/texmap/coordinated/CoordinatedAnimatedBackingStoreClient.h
         platform/graphics/texmap/coordinated/CoordinatedBackingStore.h
         platform/graphics/texmap/coordinated/CoordinatedBackingStoreProxy.h
         platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.h
-        platform/graphics/texmap/coordinated/CoordinatedGraphicsLayer.h
         platform/graphics/texmap/coordinated/CoordinatedImageBackingStore.h
+        platform/graphics/texmap/coordinated/CoordinatedPlatformLayer.h
         platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBuffer.h
         platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h
+        platform/graphics/texmap/coordinated/GraphicsLayerCoordinated.h
     )
 
     if (USE_GSTREAMER)
@@ -106,12 +108,6 @@ if (USE_COORDINATED_GRAPHICS)
             platform/graphics/cairo/CairoPaintingEngine.cpp
             platform/graphics/cairo/CairoPaintingEngineBasic.cpp
             platform/graphics/cairo/CairoPaintingEngineThreaded.cpp
-
-            platform/graphics/texmap/coordinated/CoordinatedGraphicsLayerCairo.cpp
-        )
-    elseif (USE_SKIA)
-        list(APPEND WebCore_SOURCES
-            platform/graphics/texmap/coordinated/CoordinatedGraphicsLayerSkia.cpp
         )
     endif ()
 else ()
