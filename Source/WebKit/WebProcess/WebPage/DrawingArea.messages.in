@@ -27,11 +27,11 @@
 messages -> DrawingArea {
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
     UpdateGeometry(WebCore::IntSize size) -> ()
-    SetDeviceScaleFactor(float deviceScaleFactor)
     ForceUpdate()
     DidDiscardBackingStore()
 #endif
 
+    SetDeviceScaleFactor(float deviceScaleFactor) -> ()
     DisplayDidRefresh()
 
 #if PLATFORM(COCOA)
