@@ -24,8 +24,18 @@
 #include "BitmapTexture.h"
 #include "CoordinatedTileBuffer.h"
 #include "GraphicsLayer.h"
+#include "PlatformDisplay.h"
 #include "TextureMapper.h"
 #include <wtf/SystemTracing.h>
+
+#if USE(SKIA)
+WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+#include <skia/core/SkImage.h>
+#include <skia/gpu/ganesh/GrBackendSurface.h>
+#include <skia/gpu/ganesh/SkImageGanesh.h>
+#include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
+WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+#endif
 
 namespace WebCore {
 
@@ -115,6 +125,29 @@ void CoordinatedBackingStore::drawRepaintCounter(TextureMapper& textureMapper, i
     for (const auto& tile : m_tiles.values())
         textureMapper.drawNumber(repaintCount, borderColor, tile.rect().location(), adjustedTransform);
 }
+
+#if USE(SKIA)
+void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas)
+{
+    if (m_tiles.isEmpty())
+        return;
+
+    auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
+
+    for (const auto& tile : m_tiles.values()) {
+        auto& texture = tile.texture();
+
+        GrGLTextureInfo externalTexture;
+        externalTexture.fTarget = GL_TEXTURE_2D;
+        externalTexture.fID = texture.id();
+        externalTexture.fFormat = GL_RGBA8;
+        const auto& size = texture.size();
+        auto backendTexture = GrBackendTextures::MakeGL(size.width(), size.height(), skgpu::Mipmapped::kNo, externalTexture);
+        sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+        canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), nullptr, SkCanvas::kFast_SrcRectConstraint);
+    }
+}
+#endif
 
 } // namespace WebCore
 
