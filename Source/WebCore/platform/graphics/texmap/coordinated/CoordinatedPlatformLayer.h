@@ -50,6 +50,7 @@ class NativeImage;
 class TextureMapperLayer;
 
 #if USE(SKIA)
+class SkiaCompositingLayer;
 class SkiaPaintingEngine;
 class SkiaRecordingResult;
 #endif
@@ -96,7 +97,9 @@ public:
     GraphicsLayerCoordinated* owner() const;
 
     TextureMapperLayer& ensureTarget();
-    TextureMapperLayer* target() const;
+#if USE(SKIA)
+    SkiaCompositingLayer& ensureSkiaTarget();
+#endif
     void invalidateTarget();
 
 #if ENABLE(DAMAGE_TRACKING)
@@ -183,7 +186,7 @@ public:
     void updateContents(bool affectedByTransformAnimation);
     void updateBackingStore();
 
-    void flushCompositingState(const OptionSet<CompositionReason>&);
+    void flushCompositingState(const OptionSet<CompositionReason>&, bool = false);
 
     bool hasPendingTilesCreation() const { return m_pendingTilesCreation; }
     bool isCompositionRequiredOrOngoing() const;
@@ -210,6 +213,11 @@ private:
 
 #if ENABLE(DAMAGE_TRACKING)
     void addDamage(Damage&&);
+#endif
+
+    void flushCompositingStateOnTarget(const OptionSet<CompositionReason>&, TextureMapperLayer&);
+#if USE(SKIA)
+    void flushCompositingStateOnSkiaTarget(const OptionSet<CompositionReason>&, SkiaCompositingLayer&);
 #endif
 
     enum class Change : uint32_t {
@@ -257,6 +265,9 @@ private:
 
     GraphicsLayerCoordinated* m_owner { nullptr };
     std::unique_ptr<TextureMapperLayer> m_target;
+#if USE(SKIA)
+    RefPtr<SkiaCompositingLayer> m_skiaTarget;
+#endif
     bool m_pendingTilesCreation { false };
     bool m_needsTilesUpdate { false };
 

@@ -28,7 +28,15 @@
 
 #if USE(COORDINATED_GRAPHICS)
 #include "BitmapTexture.h"
+#include "PlatformDisplay.h"
 #include "TextureMapper.h"
+
+#if USE(SKIA)
+#include <skia/core/SkImage.h>
+#include <skia/gpu/ganesh/GrBackendSurface.h>
+#include <skia/gpu/ganesh/SkImageGanesh.h>
+#include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
+#endif
 
 namespace WebCore {
 
@@ -65,6 +73,22 @@ void CoordinatedPlatformLayerBufferRGB::paintToTextureMapper(TextureMapper& text
     else
         textureMapper.drawTexture(m_textureID, m_flags, targetRect, modelViewMatrix, opacity);
 }
+
+#if USE(SKIA)
+void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const FloatRect& targetRect)
+{
+    waitForContentsIfNeeded();
+
+    auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
+    GrGLTextureInfo externalTexture;
+    externalTexture.fTarget = GL_TEXTURE_2D;
+    externalTexture.fID = m_texture ? m_texture->id() : m_textureID;
+    externalTexture.fFormat = GL_RGBA8;
+    auto backendTexture = GrBackendTextures::MakeGL(m_size.width(), m_size.height(), skgpu::Mipmapped::kNo, externalTexture);
+    sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+    canvas.drawImageRect(image, SkRect::MakeWH(m_size.width(), m_size.height()), targetRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), nullptr, SkCanvas::kFast_SrcRectConstraint);
+}
+#endif
 
 } // namespace WebCore
 
