@@ -98,10 +98,8 @@ public:
         NonComposited,
     };
 
-    static Ref<AcceleratedSurface> create(WebPage&, Function<void()>&& frameCompleteHandler, RenderingPurpose = RenderingPurpose::Composited);
+    static Ref<AcceleratedSurface> create(WebPage&, Function<void()>&& frameCompleteHandler, RenderingPurpose, bool useSkia);
     ~AcceleratedSurface();
-
-    using ColorComponents = WebCore::ColorComponents<float, 4>;
 
 #if PLATFORM(GTK) || ENABLE(WPE_PLATFORM)
     void ref() const final { ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr::ref(); }
@@ -148,10 +146,11 @@ public:
     void backgroundColorDidChange();
 
 private:
-    AcceleratedSurface(WebPage&, Function<void()>&& frameCompleteHandler, RenderingPurpose);
+    AcceleratedSurface(WebPage&, Function<void()>&& frameCompleteHandler, RenderingPurpose, bool useSkia);
 
     RenderingPurpose renderingPurpose() const { return m_renderingPurpose; }
     bool hardwareAccelerationEnabled() const { return m_hardwareAccelerationEnabled; }
+    bool useSkia() const { return m_useSkia; }
     bool isOpaque() const;
 
 #if PLATFORM(GTK) || ENABLE(WPE_PLATFORM)
@@ -296,6 +295,7 @@ private:
 
         unsigned m_colorBuffer { 0 };
         const Ref<WebCore::ShareableBitmap> m_bitmap;
+        RefPtr<WebCore::BitmapTexture> m_texture;
     };
 
     class RenderTargetTexture final : public RenderTargetShareableBuffer {
@@ -395,6 +395,7 @@ private:
 
     const WeakRef<WebPage> m_webPage;
     Function<void()> m_frameCompleteHandler;
+    bool m_useSkia { false };
     uint64_t m_id { 0 };
     RenderingPurpose m_renderingPurpose { RenderingPurpose::Composited };
     bool m_hardwareAccelerationEnabled { true };

@@ -36,6 +36,7 @@
 #include <WebCore/CoordinatedPlatformLayer.h>
 #include <WebCore/Damage.h>
 #include <WebCore/PlatformDisplay.h>
+#include <WebCore/SkiaCompositingLayer.h>
 #include <WebCore/TextureMapperLayer.h>
 #include <WebCore/TransformationMatrix.h>
 #include <wtf/SetForScope.h>
@@ -58,6 +59,12 @@ using namespace WebCore;
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(ThreadedCompositor);
 
+static bool useSkia()
+{
+    static const auto useSkiaForComposition = String::fromLatin1(getenv("WEBKIT_USE_SKIA_FOR_COMPOSITION"));
+    return !useSkiaForComposition.isEmpty() && useSkiaForComposition != "0"_s;
+}
+
 Ref<ThreadedCompositor> ThreadedCompositor::create(WebPage& webPage, LayerTreeHost& layerTreeHost, CoordinatedSceneState& sceneState)
 {
     return adoptRef(*new ThreadedCompositor(webPage, layerTreeHost, sceneState));
@@ -66,7 +73,7 @@ Ref<ThreadedCompositor> ThreadedCompositor::create(WebPage& webPage, LayerTreeHo
 ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTreeHost, CoordinatedSceneState& sceneState)
     : m_workQueue(WorkQueue::create("org.webkit.ThreadedCompositor"_s))
     , m_layerTreeHost(&layerTreeHost)
-    , m_surface(AcceleratedSurface::create(webPage, [this] { frameComplete(); }))
+    , m_surface(AcceleratedSurface::create(webPage, [this] { frameComplete(); }, AcceleratedSurface::RenderingPurpose::Composited, useSkia()))
     , m_sceneState(&sceneState)
     , m_flipY(m_surface->shouldPaintMirrored())
     , m_renderTimer(m_workQueue->runLoop(), "ThreadedCompositor::RenderTimer"_s, this, &ThreadedCompositor::renderLayerTree)
@@ -99,7 +106,8 @@ ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTre
                 m_flipY = !m_flipY;
             glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 
-            m_textureMapper = TextureMapper::create();
+            if (!useSkia())
+                m_textureMapper = TextureMapper::create();
         }
     });
 }
@@ -257,12 +265,21 @@ void ThreadedCompositor::flushCompositingState(const OptionSet<CompositionReason
         ASSERT(!reasons.contains(CompositionReason::RenderingUpdate) || !m_state.isWaitingForTiles);
     }
 #endif
-    m_sceneState->rootLayer().flushCompositingState(reasons);
+    bool useSkiaTarget = !m_textureMapper;
+    m_sceneState->rootLayer().flushCompositingState(reasons, useSkiaTarget);
     for (auto& layer : m_sceneState->committedLayers())
-        layer->flushCompositingState(reasons);
+        layer->flushCompositingState(reasons, useSkiaTarget);
 }
 
 void ThreadedCompositor::paintToCurrentGLContext(const TransformationMatrix& matrix, const IntSize& size, const OptionSet<CompositionReason>& reasons)
+{
+    if (m_textureMapper)
+        paintToTextureMapper(matrix, size, reasons);
+    else
+        paintToSkiaCanvas(matrix, size, reasons);
+}
+
+void ThreadedCompositor::paintToTextureMapper(const TransformationMatrix& matrix, const IntSize& size, const OptionSet<CompositionReason>& reasons)
 {
     FloatRect clipRect(FloatPoint { }, size);
     TextureMapperLayer& currentRootLayer = m_sceneState->rootLayer().ensureTarget();
@@ -328,6 +345,28 @@ void ThreadedCompositor::paintToCurrentGLContext(const TransformationMatrix& mat
 
     if (sceneHasRunningAnimations)
         requestComposition(CompositionReason::Animation);
+}
+
+void ThreadedCompositor::paintToSkiaCanvas(const TransformationMatrix& matrix, const IntSize& size, const OptionSet<CompositionReason>& reasons)
+{
+    auto* canvas = m_surface->canvas();
+    if (!canvas)
+        return;
+
+    auto& rootLayer = m_sceneState->rootLayer().ensureSkiaTarget();
+    rootLayer.setTransform(matrix);
+
+    auto& display = PlatformDisplay::sharedDisplay();
+    display.skiaGLContext()->makeContextCurrent();
+
+    canvas->save();
+    rootLayer.paint(*canvas);
+    canvas->restore();
+
+    if (auto* surface = canvas->getSurface())
+        display.skiaGrContext()->flushAndSubmit(surface, GrSyncCpu::kNo);
+
+    m_context->makeContextCurrent();
 }
 
 #if HAVE(OS_SIGNPOST) || USE(SYSPROF_CAPTURE)
