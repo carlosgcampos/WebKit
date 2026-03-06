@@ -26,6 +26,7 @@
 #pragma once
 
 #if USE(SKIA)
+#include "Color.h"
 #include "CoordinatedBackingStoreProxy.h"
 #include "FloatPoint.h"
 #include "FloatPoint3D.h"
@@ -65,6 +66,7 @@ public:
     void updateBackingStore(CoordinatedBackingStoreProxy::Update&&, float);
     void setImageBackingStore(CoordinatedImageBackingStore*);
     void setContentsBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&&);
+    void setContentsSolidColor(const Color&);
 
     void computeTransforms();
     void paint(SkCanvas&);
@@ -91,6 +93,7 @@ private:
     RefPtr<CoordinatedAnimatedBackingStoreClient> m_animatedBackingStoreClient;
     RefPtr<CoordinatedImageBackingStore> m_imageBackingStore;
     std::unique_ptr<CoordinatedPlatformLayerBuffer> m_contentsBuffer;
+    Color m_contentsSolidColor;
     struct {
         TransformationMatrix local;
         TransformationMatrix combined;
