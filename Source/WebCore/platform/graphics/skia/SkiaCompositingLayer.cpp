@@ -32,6 +32,7 @@
 #include "CoordinatedImageBackingStore.h"
 #include "CoordinatedPlatformLayerBuffer.h"
 #include "CoordinatedTileBuffer.h"
+#include <wtf/SetForScope.h>
 #include <wtf/TZoneMallocInlines.h>
 
 namespace WebCore {
@@ -149,10 +150,11 @@ void SkiaCompositingLayer::computeTransforms()
 void SkiaCompositingLayer::paint(SkCanvas& canvas)
 {
     computeTransforms();
-    recursivePaint(canvas);
+    PaintContext context;
+    recursivePaint(canvas, context);
 }
 
-void SkiaCompositingLayer::paintLayer(SkCanvas& canvas)
+void SkiaCompositingLayer::paintLayer(SkCanvas& canvas, PaintContext& context)
 {
     if (m_size.isEmpty())
         return;
@@ -163,27 +165,31 @@ void SkiaCompositingLayer::paintLayer(SkCanvas& canvas)
     canvas.save();
     canvas.concat(SkM44(m_transforms.combined));
 
+    SkPaint paint;
+    paint.setStyle(SkPaint::kFill_Style);
+    paint.setAlphaf(context.opacity);
+
     if (m_backingStore)
-        m_backingStore->paintToCanvas(canvas);
+        m_backingStore->paintToCanvas(canvas, paint);
 
     if (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()) {
-        SkPaint paint;
-        paint.setStyle(SkPaint::kFill_Style);
-        paint.setColor(SkColor(m_contentsSolidColor));
+        paint.setColor(SkColor(m_contentsSolidColor.colorWithAlphaMultipliedBy(context.opacity)));
         canvas.drawRect(m_contentsRect, paint);
     } else if (m_contentsBuffer)
-        m_contentsBuffer->paintToCanvas(canvas, m_contentsRect);
+        m_contentsBuffer->paintToCanvas(canvas, m_contentsRect, paint);
     else if (m_imageBackingStore) {
         if (auto* buffer = m_imageBackingStore->buffer())
-            buffer->paintToCanvas(canvas, m_contentsRect);
+            buffer->paintToCanvas(canvas, m_contentsRect, paint);
     }
 
     canvas.restore();
 }
 
-void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas)
+void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& context)
 {
-    paintLayer(canvas);
+    SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
+
+    paintLayer(canvas, context);
 
     if (m_children.isEmpty())
         return;
@@ -195,7 +201,7 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas)
     }
 
     for (auto& child : m_children)
-        child->recursivePaint(canvas);
+        child->recursivePaint(canvas, context);
 
     if (shouldClip)
         canvas.restore();

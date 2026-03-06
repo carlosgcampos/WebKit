@@ -56,7 +56,7 @@ public:
     void drawRepaintCounter(TextureMapper&, int repaintCount, const Color&, const FloatRect&, const TransformationMatrix&) override;
 
 #if USE(SKIA)
-    void paintToCanvas(SkCanvas&);
+    void paintToCanvas(SkCanvas&, const SkPaint&);
 #endif
 
 private:

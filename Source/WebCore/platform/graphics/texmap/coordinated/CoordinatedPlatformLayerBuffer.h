@@ -66,7 +66,7 @@ public:
     }
 
 #if USE(SKIA)
-    virtual void paintToCanvas(SkCanvas&, const FloatRect&) { }
+    virtual void paintToCanvas(SkCanvas&, const FloatRect&, const SkPaint&) { }
 #endif
 
 protected:
