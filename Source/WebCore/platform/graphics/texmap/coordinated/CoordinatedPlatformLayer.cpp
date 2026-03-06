@@ -1229,7 +1229,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::ContentsColor)) {
-            notImplemented();
+            layer.setContentsSolidColor(m_contentsColor);
             m_pendingChanges.remove(Change::ContentsColor);
         }
 

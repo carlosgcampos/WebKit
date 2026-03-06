@@ -109,6 +109,11 @@ void SkiaCompositingLayer::setContentsBuffer(std::unique_ptr<CoordinatedPlatform
     m_contentsBuffer = WTF::move(contentsBuffer);
 }
 
+void SkiaCompositingLayer::setContentsSolidColor(const Color& color)
+{
+    m_contentsSolidColor = color;
+}
+
 void SkiaCompositingLayer::computeTransforms()
 {
     m_transforms.local = m_transform;
@@ -152,7 +157,7 @@ void SkiaCompositingLayer::paintLayer(SkCanvas& canvas)
     if (m_size.isEmpty())
         return;
 
-    if (!m_backingStore && !m_imageBackingStore && !m_contentsBuffer)
+    if (!m_backingStore && !m_imageBackingStore && !m_contentsBuffer && !m_contentsSolidColor)
         return;
 
     canvas.save();
@@ -161,7 +166,12 @@ void SkiaCompositingLayer::paintLayer(SkCanvas& canvas)
     if (m_backingStore)
         m_backingStore->paintToCanvas(canvas);
 
-    if (m_contentsBuffer)
+    if (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()) {
+        SkPaint paint;
+        paint.setStyle(SkPaint::kFill_Style);
+        paint.setColor(SkColor(m_contentsSolidColor));
+        canvas.drawRect(m_contentsRect, paint);
+    } else if (m_contentsBuffer)
         m_contentsBuffer->paintToCanvas(canvas, m_contentsRect);
     else if (m_imageBackingStore) {
         if (auto* buffer = m_imageBackingStore->buffer())
