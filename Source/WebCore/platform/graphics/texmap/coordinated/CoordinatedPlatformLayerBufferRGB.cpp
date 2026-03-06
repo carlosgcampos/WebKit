@@ -75,7 +75,7 @@ void CoordinatedPlatformLayerBufferRGB::paintToTextureMapper(TextureMapper& text
 }
 
 #if USE(SKIA)
-void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const FloatRect& targetRect)
+void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const FloatRect& targetRect, const SkPaint& paint)
 {
     waitForContentsIfNeeded();
 
@@ -86,7 +86,7 @@ void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const Fl
     externalTexture.fFormat = GL_RGBA8;
     auto backendTexture = GrBackendTextures::MakeGL(m_size.width(), m_size.height(), skgpu::Mipmapped::kNo, externalTexture);
     sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
-    canvas.drawImageRect(image, SkRect::MakeWH(m_size.width(), m_size.height()), targetRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), nullptr, SkCanvas::kFast_SrcRectConstraint);
+    canvas.drawImageRect(image, SkRect::MakeWH(m_size.width(), m_size.height()), targetRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &paint, SkCanvas::kFast_SrcRectConstraint);
 }
 #endif
 

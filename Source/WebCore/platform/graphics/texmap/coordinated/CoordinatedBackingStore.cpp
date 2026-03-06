@@ -127,7 +127,7 @@ void CoordinatedBackingStore::drawRepaintCounter(TextureMapper& textureMapper, i
 }
 
 #if USE(SKIA)
-void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas)
+void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& paint)
 {
     if (m_tiles.isEmpty())
         return;
@@ -144,7 +144,7 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas)
         const auto& size = texture.size();
         auto backendTexture = GrBackendTextures::MakeGL(size.width(), size.height(), skgpu::Mipmapped::kNo, externalTexture);
         sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
-        canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), nullptr, SkCanvas::kFast_SrcRectConstraint);
+        canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &paint, SkCanvas::kFast_SrcRectConstraint);
     }
 }
 #endif

@@ -56,6 +56,7 @@ public:
     void setTransform(const TransformationMatrix& matrix) { m_transform = matrix; }
     void setChildrenTransform(const TransformationMatrix& matrix) { m_childrenTransform = matrix; }
     void setMasksToBounds(bool masksToBounds) { m_masksToBounds = masksToBounds; }
+    void setOpacity(float opacity) { m_opacity = opacity; }
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
 
     void setChildren(Vector<Ref<SkiaCompositingLayer>>&&);
@@ -74,8 +75,12 @@ private:
 
     void removeFromParent();
 
-    void recursivePaint(SkCanvas&);
-    void paintLayer(SkCanvas&);
+    struct PaintContext {
+        float opacity { 1 };
+    };
+
+    void recursivePaint(SkCanvas&, PaintContext&);
+    void paintLayer(SkCanvas&, PaintContext&);
 
     Vector<Ref<SkiaCompositingLayer>> m_children;
     WeakPtr<SkiaCompositingLayer> m_parent;
@@ -87,6 +92,7 @@ private:
     TransformationMatrix m_transform;
     TransformationMatrix m_childrenTransform;
     bool m_masksToBounds { false };
+    float m_opacity { 1 };
     RefPtr<CoordinatedBackingStore> m_backingStore;
     RefPtr<CoordinatedAnimatedBackingStoreClient> m_animatedBackingStoreClient;
     RefPtr<CoordinatedImageBackingStore> m_imageBackingStore;
