@@ -1184,7 +1184,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::Opacity)) {
-            notImplemented();
+            layer.setOpacity(m_opacity);
             m_pendingChanges.remove(Change::Opacity);
         }
 
