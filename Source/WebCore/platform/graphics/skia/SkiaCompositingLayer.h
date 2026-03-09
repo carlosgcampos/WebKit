@@ -80,7 +80,7 @@ public:
     const TransformationMatrix& toSurfaceTransform() const { return m_transforms.combined; }
     FloatRect effectiveLayerRect() const { return FloatRect({ }, m_size); }
 
-    void computeTransforms(SkiaCompositingLayer* = nullptr);
+    void computeTransforms(WeakPtr<SkiaCompositingLayer> = nullptr);
     void paint(SkCanvas&);
 
 private:
