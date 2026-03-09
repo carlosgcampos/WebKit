@@ -110,14 +110,14 @@ static inline bool quadsIntersect(const FloatQuad& quadA, const FloatQuad& quadB
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(SkiaCompositingLayer3DRenderingContext);
 
-void SkiaCompositingLayer3DRenderingContext::paint(const Vector<SkiaCompositingLayer*>& compositingLayers,
+void SkiaCompositingLayer3DRenderingContext::paint(const Vector<Ref<SkiaCompositingLayer>>& compositingLayers,
     const std::function<void(SkiaCompositingLayer&, std::optional<SkPath>)>& paintLayerFunction)
 {
     if (compositingLayers.isEmpty())
         return;
 
     Vector<Layer> layers;
-    for (auto* compositingLayer : compositingLayers) {
+    for (auto& compositingLayer : compositingLayers) {
         FloatPolygon3D geometry(compositingLayer->effectiveLayerRect(), compositingLayer->toSurfaceTransform());
         BoundingBox boundingBox = computeBoundingBox(geometry);
         layers.append({ geometry, boundingBox, compositingLayer });
@@ -151,7 +151,7 @@ void SkiaCompositingLayer3DRenderingContext::paint(const Vector<SkiaCompositingL
         });
 
         for (auto& layer : layers)
-            paintLayerFunction(*layer.compositingLayer, std::nullopt);
+            paintLayerFunction(layer.compositingLayer.get(), std::nullopt);
         return;
     }
 
@@ -185,11 +185,11 @@ void SkiaCompositingLayer3DRenderingContext::paint(const Vector<SkiaCompositingL
     traverseTree(*root, [&paintLayerFunction, &buildClipPath](LayerNode& node) {
         for (auto& layer : node.layers) {
             if (!layer.isSplit) {
-                paintLayerFunction(*layer.compositingLayer, std::nullopt);
+                paintLayerFunction(layer.compositingLayer.get(), std::nullopt);
                 continue;
             }
 
-            paintLayerFunction(*layer.compositingLayer, buildClipPath(layer));
+            paintLayerFunction(layer.compositingLayer.get(), buildClipPath(layer));
         }
     });
 }

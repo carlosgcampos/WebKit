@@ -32,6 +32,7 @@ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkPath.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #include <wtf/Deque.h>
+#include <wtf/Ref.h>
 #include <wtf/HashSet.h>
 #include <wtf/TZoneMalloc.h>
 
@@ -43,7 +44,7 @@ class SkiaCompositingLayer;
 class SkiaCompositingLayer3DRenderingContext final {
     WTF_MAKE_TZONE_ALLOCATED(SkiaCompositingLayer3DRenderingContext);
 public:
-    void paint(const Vector<SkiaCompositingLayer*>&,
+    void paint(const Vector<Ref<SkiaCompositingLayer>>&,
         const std::function<void(SkiaCompositingLayer&, std::optional<SkPath>)>&);
 
 private:
@@ -62,7 +63,7 @@ private:
     struct Layer final {
         FloatPolygon3D geometry;
         BoundingBox boundingBox;
-        SkiaCompositingLayer* compositingLayer { nullptr };
+        Ref<SkiaCompositingLayer> compositingLayer;
         bool isSplit { false };
     };
 

@@ -96,7 +96,7 @@ private:
     void paintSelf(SkCanvas&, PaintContext&);
     void paintSelfAndChildren(SkCanvas&, PaintContext&);
     void paintWith3DRenderingContext(SkCanvas&, PaintContext&);
-    void collect3DRenderingContextLayers(Vector<SkiaCompositingLayer*>&);
+    void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
 
     Vector<Ref<SkiaCompositingLayer>> m_children;
     WeakPtr<SkiaCompositingLayer> m_parent;
