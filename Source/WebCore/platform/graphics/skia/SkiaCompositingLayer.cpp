@@ -164,13 +164,7 @@ void SkiaCompositingLayer::paint(SkCanvas& canvas)
 
 void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 {
-    if (m_size.isEmpty())
-        return;
-
-    if (!m_visible || !m_contentsVisible)
-        return;
-
-    if (!m_backingStore && !m_imageBackingStore && !m_contentsBuffer && !m_contentsSolidColor)
+    if (m_size.isEmpty() || !m_visible || !m_contentsVisible || !hasVisualContent())
         return;
 
     canvas.save();
@@ -226,6 +220,8 @@ bool SkiaCompositingLayer::isVisible() const
     if (!m_visible && m_children.isEmpty())
         return false;
     if (!m_contentsVisible && m_children.isEmpty())
+        return false;
+    if (!hasVisualContent() && m_children.isEmpty())
         return false;
     if (m_opacity < cOpacityVisibilityThreshold)
         return false;
