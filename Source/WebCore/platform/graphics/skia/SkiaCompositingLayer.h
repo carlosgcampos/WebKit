@@ -57,6 +57,9 @@ public:
     void setBoundsOrigin(const FloatPoint& point) { m_boundsOrigin = point; }
     void setTransform(const TransformationMatrix& matrix) { m_transform = matrix; }
     void setChildrenTransform(const TransformationMatrix& matrix) { m_childrenTransform = matrix; }
+    void setPreserves3D(bool preserves3D) { m_preserves3D = preserves3D; }
+    void setBackfaceVisibility(bool visible) { m_backfaceVisibility = visible; }
+    void setContentsVisible(bool visible) { m_contentsVisible = visible; }
     void setMasksToBounds(bool masksToBounds) { m_masksToBounds = masksToBounds; }
     void setOpacity(float opacity) { m_opacity = opacity; }
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
@@ -76,6 +79,7 @@ private:
     SkiaCompositingLayer() = default;
 
     void removeFromParent();
+    bool isVisible() const;
 
     struct PaintContext {
         float opacity { 1 };
@@ -93,6 +97,10 @@ private:
     FloatRect m_contentsRect;
     TransformationMatrix m_transform;
     TransformationMatrix m_childrenTransform;
+    bool m_preserves3D { false };
+    bool m_backfaceVisibility { true };
+    bool m_contentsVisible { true };
+    bool m_visible { true };
     bool m_masksToBounds { false };
     float m_opacity { 1 };
     RefPtr<CoordinatedBackingStore> m_backingStore;
