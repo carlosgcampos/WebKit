@@ -66,7 +66,8 @@ public:
     void setContentsRectClipsDescendants(bool clips) { m_contentsRectClipsDescendants = clips; }
     void setOpacity(float opacity) { m_opacity = opacity; }
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
-    void setMask(SkiaCompositingLayer* mask) { m_mask = mask; }
+    void setMask(RefPtr<SkiaCompositingLayer>&&);
+    void setReplica(RefPtr<SkiaCompositingLayer>&&);
 
     void setChildren(Vector<Ref<SkiaCompositingLayer>>&&);
 
@@ -98,7 +99,9 @@ private:
     void recursivePaint(SkCanvas&, PaintContext&);
     void paintSelf(SkCanvas&, PaintContext&);
     void paintSelfAndChildren(SkCanvas&, PaintContext&);
+    void paintSelfAndChildrenWithReplica(SkCanvas&, PaintContext&);
     void paintWith3DRenderingContext(SkCanvas&, PaintContext&);
+    TransformationMatrix replicaTransform() const;
     void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
 
     Vector<Ref<SkiaCompositingLayer>> m_children;
@@ -119,6 +122,9 @@ private:
     FloatRoundedRect m_contentsClippingRect;
     float m_opacity { 1 };
     RefPtr<SkiaCompositingLayer> m_mask;
+    RefPtr<SkiaCompositingLayer> m_replica;
+    WeakPtr<SkiaCompositingLayer> m_effectTarget;
+    bool m_isReplica { false };
     RefPtr<CoordinatedBackingStore> m_backingStore;
     RefPtr<CoordinatedAnimatedBackingStoreClient> m_animatedBackingStoreClient;
     RefPtr<CoordinatedImageBackingStore> m_imageBackingStore;
