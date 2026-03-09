@@ -1137,7 +1137,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::ContentsClippingRect)) {
-            notImplemented();
+            layer.setContentsClippingRect(m_contentsClippingRect);
             m_pendingChanges.remove(Change::ContentsClippingRect);
         }
 
@@ -1205,7 +1205,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::ContentsRectClipsDescendants)) {
-            notImplemented();
+            layer.setContentsRectClipsDescendants(m_contentsRectClipsDescendants);
             m_pendingChanges.remove(Change::ContentsRectClipsDescendants);
         }
 

@@ -31,6 +31,7 @@
 #include "FloatPoint.h"
 #include "FloatPoint3D.h"
 #include "FloatRect.h"
+#include "FloatRoundedRect.h"
 #include "TransformationMatrix.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkCanvas.h>
@@ -61,6 +62,8 @@ public:
     void setBackfaceVisibility(bool visible) { m_backfaceVisibility = visible; }
     void setContentsVisible(bool visible) { m_contentsVisible = visible; }
     void setMasksToBounds(bool masksToBounds) { m_masksToBounds = masksToBounds; }
+    void setContentsClippingRect(const FloatRoundedRect& rect) { m_contentsClippingRect = rect; }
+    void setContentsRectClipsDescendants(bool clips) { m_contentsRectClipsDescendants = clips; }
     void setOpacity(float opacity) { m_opacity = opacity; }
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
     void setMask(SkiaCompositingLayer* mask) { m_mask = mask; }
@@ -112,6 +115,8 @@ private:
     bool m_contentsVisible { true };
     bool m_visible { true };
     bool m_masksToBounds { false };
+    bool m_contentsRectClipsDescendants { false };
+    FloatRoundedRect m_contentsClippingRect;
     float m_opacity { 1 };
     RefPtr<SkiaCompositingLayer> m_mask;
     RefPtr<CoordinatedBackingStore> m_backingStore;
