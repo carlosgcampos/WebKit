@@ -84,7 +84,8 @@ private:
     };
 
     void recursivePaint(SkCanvas&, PaintContext&);
-    void paintLayer(SkCanvas&, PaintContext&);
+    void paintSelf(SkCanvas&, PaintContext&);
+    void paintSelfAndChildren(SkCanvas&, PaintContext&);
 
     Vector<Ref<SkiaCompositingLayer>> m_children;
     WeakPtr<SkiaCompositingLayer> m_parent;

@@ -158,7 +158,7 @@ void SkiaCompositingLayer::paint(SkCanvas& canvas)
     recursivePaint(canvas, context);
 }
 
-void SkiaCompositingLayer::paintLayer(SkCanvas& canvas, PaintContext& context)
+void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 {
     if (m_size.isEmpty())
         return;
@@ -192,6 +192,26 @@ void SkiaCompositingLayer::paintLayer(SkCanvas& canvas, PaintContext& context)
     canvas.restore();
 }
 
+void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& context)
+{
+    paintSelf(canvas, context);
+
+    if (m_children.isEmpty())
+        return;
+
+    bool shouldClip = m_masksToBounds;
+    if (shouldClip) {
+        // FIXME: clip.
+        canvas.save();
+    }
+
+    for (auto& child : m_children)
+        child->recursivePaint(canvas, context);
+
+    if (shouldClip)
+        canvas.restore();
+}
+
 bool SkiaCompositingLayer::isVisible() const
 {
     constexpr float cOpacityVisibilityThreshold = 0.01;
@@ -213,22 +233,7 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
 
     SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
 
-    paintLayer(canvas, context);
-
-    if (m_children.isEmpty())
-        return;
-
-    bool shouldClip = m_masksToBounds;
-    if (shouldClip) {
-        // FIXME: clip.
-        canvas.save();
-    }
-
-    for (auto& child : m_children)
-        child->recursivePaint(canvas, context);
-
-    if (shouldClip)
-        canvas.restore();
+    paintSelfAndChildren(canvas, context);
 }
 
 } // namespace WebCore
