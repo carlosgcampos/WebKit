@@ -284,8 +284,7 @@ void SkiaCompositingLayer::paintWith3DRenderingContext(SkCanvas& canvas, PaintCo
     Vector<Ref<SkiaCompositingLayer>> layers;
     collect3DRenderingContextLayers(layers);
 
-    SkiaCompositingLayer3DRenderingContext renderingContext;
-    renderingContext.paint(layers, [&](SkiaCompositingLayer& layer, std::optional<SkPath> clipPath) {
+    SkiaCompositingLayer3DRenderingContext::paint(layers, [&](SkiaCompositingLayer& layer, std::optional<SkPath> clipPath) {
         if (clipPath) {
             canvas.save();
             canvas.clipPath(*clipPath);

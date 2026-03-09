@@ -32,8 +32,8 @@ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkPath.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #include <wtf/Deque.h>
-#include <wtf/Ref.h>
 #include <wtf/HashSet.h>
+#include <wtf/Ref.h>
 #include <wtf/TZoneMalloc.h>
 
 namespace WebCore {
@@ -41,10 +41,9 @@ namespace WebCore {
 class FloatPlane3D;
 class SkiaCompositingLayer;
 
-class SkiaCompositingLayer3DRenderingContext final {
-    WTF_MAKE_TZONE_ALLOCATED(SkiaCompositingLayer3DRenderingContext);
+class SkiaCompositingLayer3DRenderingContext {
 public:
-    void paint(const Vector<Ref<SkiaCompositingLayer>>&,
+    static void paint(const Vector<Ref<SkiaCompositingLayer>>&,
         const std::function<void(SkiaCompositingLayer&, std::optional<SkPath>)>&);
 
 private:
@@ -55,20 +54,20 @@ private:
         Intersecting
     };
 
-    struct BoundingBox final {
+    struct BoundingBox {
         FloatPoint3D min;
         FloatPoint3D max;
     };
 
-    struct Layer final {
+    struct Layer {
         FloatPolygon3D geometry;
         BoundingBox boundingBox;
         Ref<SkiaCompositingLayer> compositingLayer;
         bool isSplit { false };
     };
 
-    struct LayerNode final {
-        WTF_DEPRECATED_MAKE_STRUCT_FAST_ALLOCATED(LayerNode);
+    struct LayerNode {
+        WTF_MAKE_STRUCT_TZONE_ALLOCATED(LayerNode);
 
         explicit LayerNode(Layer&& layer)
         {
