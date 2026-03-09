@@ -134,9 +134,13 @@ void SkiaCompositingLayer::computeTransforms()
         m_transforms.combinedForChildren = m_transforms.combined;
         m_transforms.combined.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
 
+        if (!m_preserves3D)
+            m_transforms.combinedForChildren.flatten();
         m_transforms.combinedForChildren.multiply(m_childrenTransform);
         m_transforms.combinedForChildren.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
     }
+
+    m_visible = m_backfaceVisibility || !m_transforms.combined.isBackFaceVisible();
 
     for (auto& child : m_children)
         child->computeTransforms();
@@ -157,6 +161,9 @@ void SkiaCompositingLayer::paint(SkCanvas& canvas)
 void SkiaCompositingLayer::paintLayer(SkCanvas& canvas, PaintContext& context)
 {
     if (m_size.isEmpty())
+        return;
+
+    if (!m_visible || !m_contentsVisible)
         return;
 
     if (!m_backingStore && !m_imageBackingStore && !m_contentsBuffer && !m_contentsSolidColor)
@@ -185,8 +192,25 @@ void SkiaCompositingLayer::paintLayer(SkCanvas& canvas, PaintContext& context)
     canvas.restore();
 }
 
+bool SkiaCompositingLayer::isVisible() const
+{
+    constexpr float cOpacityVisibilityThreshold = 0.01;
+    if (m_size.isEmpty() && (m_masksToBounds || m_children.isEmpty()))
+        return false;
+    if (!m_visible && m_children.isEmpty())
+        return false;
+    if (!m_contentsVisible && m_children.isEmpty())
+        return false;
+    if (m_opacity < cOpacityVisibilityThreshold)
+        return false;
+    return true;
+}
+
 void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& context)
 {
+    if (!isVisible())
+        return;
+
     SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
 
     paintLayer(canvas, context);
