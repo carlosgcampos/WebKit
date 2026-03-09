@@ -63,6 +63,7 @@ public:
     void setMasksToBounds(bool masksToBounds) { m_masksToBounds = masksToBounds; }
     void setOpacity(float opacity) { m_opacity = opacity; }
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
+    void setMask(SkiaCompositingLayer* mask) { m_mask = mask; }
 
     void setChildren(Vector<Ref<SkiaCompositingLayer>>&&);
 
@@ -72,7 +73,7 @@ public:
     void setContentsBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&&);
     void setContentsSolidColor(const Color&);
 
-    void computeTransforms();
+    void computeTransforms(SkiaCompositingLayer* = nullptr);
     void paint(SkCanvas&);
 
 private:
@@ -83,6 +84,7 @@ private:
 
     struct PaintContext {
         float opacity { 1 };
+        bool isMask { false };
     };
 
     void recursivePaint(SkCanvas&, PaintContext&);
@@ -104,6 +106,7 @@ private:
     bool m_visible { true };
     bool m_masksToBounds { false };
     float m_opacity { 1 };
+    RefPtr<SkiaCompositingLayer> m_mask;
     RefPtr<CoordinatedBackingStore> m_backingStore;
     RefPtr<CoordinatedAnimatedBackingStoreClient> m_animatedBackingStoreClient;
     RefPtr<CoordinatedImageBackingStore> m_imageBackingStore;
