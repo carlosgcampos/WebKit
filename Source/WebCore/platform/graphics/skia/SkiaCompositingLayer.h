@@ -26,6 +26,7 @@
 #pragma once
 
 #if USE(SKIA)
+#include "Color.h"
 #include "CoordinatedBackingStoreProxy.h"
 #include "FloatPoint.h"
 #include "FloatPoint3D.h"
@@ -42,6 +43,7 @@ namespace WebCore {
 class CoordinatedAnimatedBackingStoreClient;
 class CoordinatedBackingStore;
 class CoordinatedImageBackingStore;
+class CoordinatedPlatformLayerBuffer;
 
 class SkiaCompositingLayer final : public RefCountedAndCanMakeWeakPtr<SkiaCompositingLayer> {
     WTF_MAKE_TZONE_ALLOCATED(SkiaCompositingLayer);
