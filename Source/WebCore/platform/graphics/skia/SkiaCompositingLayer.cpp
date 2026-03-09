@@ -33,6 +33,10 @@
 #include "CoordinatedPlatformLayerBuffer.h"
 #include "CoordinatedTileBuffer.h"
 #include "SkiaCompositingLayer3DRenderingContext.h"
+WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+#include <skia/core/SkPathBuilder.h>
+#include <skia/core/SkRRect.h>
+WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #include <wtf/SetForScope.h>
 #include <wtf/TZoneMallocInlines.h>
 
@@ -182,11 +186,23 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     if (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()) {
         paint.setColor(SkColor(m_contentsSolidColor.colorWithAlphaMultipliedBy(context.opacity)));
         canvas.drawRect(m_contentsRect, paint);
-    } else if (m_contentsBuffer)
-        m_contentsBuffer->paintToCanvas(canvas, m_contentsRect, paint);
-    else if (m_imageBackingStore) {
-        if (auto* buffer = m_imageBackingStore->buffer())
+    } else if (m_contentsBuffer || m_imageBackingStore) {
+        bool shouldClipContents = m_contentsClippingRect.isRounded() || !m_contentsClippingRect.rect().contains(m_contentsRect);
+        if (shouldClipContents) {
+            canvas.save();
+            if (m_contentsClippingRect.isRounded())
+                canvas.clipRRect(SkRRect(m_contentsClippingRect), true);
+            else
+                canvas.clipRect(SkRect(m_contentsClippingRect.rect()));
+        }
+
+        if (m_contentsBuffer)
+            m_contentsBuffer->paintToCanvas(canvas, m_contentsRect, paint);
+        else if (auto* buffer = m_imageBackingStore->buffer())
             buffer->paintToCanvas(canvas, m_contentsRect, paint);
+
+        if (shouldClipContents)
+            canvas.restore();
     }
 
     canvas.restore();
@@ -199,10 +215,23 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
     if (m_children.isEmpty())
         return;
 
-    bool shouldClip = m_masksToBounds;
+    bool shouldClip = (m_masksToBounds || m_contentsRectClipsDescendants) && !m_preserves3D;
     if (shouldClip) {
-        // FIXME: clip.
         canvas.save();
+        if (m_contentsRectClipsDescendants) {
+            SkPathBuilder builder;
+            if (m_contentsClippingRect.isRounded())
+                builder.addRRect(SkRRect(m_contentsClippingRect));
+            else
+                builder.addRect(SkRect(m_contentsClippingRect.rect()));
+            canvas.clipPath(builder.detach().makeTransform(SkM44(m_transforms.combined).asM33()), true);
+        } else {
+            auto clipTransform = m_transforms.combined;
+            clipTransform.translate(m_boundsOrigin.x(), m_boundsOrigin.y());
+            SkPathBuilder builder;
+            builder.addRect(SkRect(effectiveLayerRect()));
+            canvas.clipPath(builder.detach().makeTransform(SkM44(clipTransform).asM33()));
+        }
     }
 
     for (auto& child : m_children)
