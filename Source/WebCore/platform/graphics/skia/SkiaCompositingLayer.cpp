@@ -32,6 +32,7 @@
 #include "CoordinatedImageBackingStore.h"
 #include "CoordinatedPlatformLayerBuffer.h"
 #include "CoordinatedTileBuffer.h"
+#include "SkiaCompositingLayer3DRenderingContext.h"
 #include <wtf/SetForScope.h>
 #include <wtf/TZoneMallocInlines.h>
 
@@ -248,7 +249,56 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
 
     SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
 
-    paintSelfAndChildren(canvas, context);
+    if (m_preserves3D)
+        paintWith3DRenderingContext(canvas, context);
+    else
+        paintSelfAndChildren(canvas, context);
+}
+
+bool SkiaCompositingLayer::hasVisualContent() const
+{
+    // FIXME: hasFilters() / hasBackdrop() conditions
+    // FIXME: Consider background color (compare with `bool hasVisualContent`)
+    return m_backingStore || m_imageBackingStore || m_contentsBuffer
+        || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible());
+}
+
+void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<SkiaCompositingLayer*>& layers)
+{
+    if (m_preserves3D || isLeafOf3DRenderingContext()) {
+        // Add layers to 3d rendering context only if they get actually painted.
+        if (isVisible() && (hasVisualContent() || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
+            layers.append(this);
+
+        // Stop recursion on 3d rendering context leaf
+        if (isLeafOf3DRenderingContext())
+            return;
+    }
+
+    for (auto& child : m_children)
+        child->collect3DRenderingContextLayers(layers);
+}
+
+void SkiaCompositingLayer::paintWith3DRenderingContext(SkCanvas& canvas, PaintContext& context)
+{
+    Vector<SkiaCompositingLayer*> layers;
+    collect3DRenderingContextLayers(layers);
+
+    SkiaCompositingLayer3DRenderingContext renderingContext;
+    renderingContext.paint(layers, [&](SkiaCompositingLayer& layer, std::optional<SkPath> clipPath) {
+        if (clipPath) {
+            canvas.save();
+            canvas.clipPath(*clipPath);
+        }
+
+        if (layer.m_preserves3D)
+            layer.paintSelf(canvas, context);
+        else
+            layer.recursivePaint(canvas, context);
+
+        if (clipPath)
+            canvas.restore();
+    });
 }
 
 } // namespace WebCore
