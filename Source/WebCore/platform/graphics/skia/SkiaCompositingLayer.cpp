@@ -173,9 +173,6 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     if (!m_backingStore && !m_imageBackingStore && !m_contentsBuffer && !m_contentsSolidColor)
         return;
 
-    if (m_mask)
-	canvas.saveLayer(nullptr, nullptr);
-
     canvas.save();
     canvas.concat(SkM44(m_transforms.combined));
 
@@ -199,13 +196,6 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     }
 
     canvas.restore();
-
-    if (m_mask) {
-        SetForScope scopedMask(context.isMask, true);
-        m_mask->paintSelf(canvas, context);
-
-        canvas.restore();
-    }
 }
 
 void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& context)
@@ -249,10 +239,22 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
 
     SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
 
-    if (m_preserves3D)
+    if (m_preserves3D) {
         paintWith3DRenderingContext(canvas, context);
-    else
-        paintSelfAndChildren(canvas, context);
+        return;
+    }
+
+    if (m_mask)
+        canvas.saveLayer(nullptr, nullptr);
+
+    paintSelfAndChildren(canvas, context);
+
+    if (m_mask) {
+        SetForScope scopedMask(context.isMask, true);
+        m_mask->paintSelf(canvas, context);
+
+        canvas.restore();
+    }
 }
 
 bool SkiaCompositingLayer::hasVisualContent() const
