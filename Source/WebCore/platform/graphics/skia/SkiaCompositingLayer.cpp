@@ -115,14 +115,14 @@ void SkiaCompositingLayer::setContentsSolidColor(const Color& color)
     m_contentsSolidColor = color;
 }
 
-void SkiaCompositingLayer::computeTransforms()
+void SkiaCompositingLayer::computeTransforms(SkiaCompositingLayer* parent)
 {
     m_transforms.local = m_transform;
 
     if (!m_size.isEmpty() || !m_masksToBounds) {
         TransformationMatrix parentTransform;
-        if (m_parent)
-            parentTransform = m_parent->m_transforms.combinedForChildren;
+        if (parent)
+            parentTransform = parent->m_transforms.combinedForChildren;
 
         FloatPoint origin(m_anchorPoint.x(), m_anchorPoint.y());
         origin.scale(m_size.width(), m_size.height());
@@ -142,8 +142,11 @@ void SkiaCompositingLayer::computeTransforms()
 
     m_visible = m_backfaceVisibility || !m_transforms.combined.isBackFaceVisible();
 
+    if (m_mask)
+        m_mask->computeTransforms(this);
+
     for (auto& child : m_children)
-        child->computeTransforms();
+        child->computeTransforms(this);
 
     if (m_animatedBackingStoreClient) {
         // FIXME: use future combined.
@@ -169,12 +172,17 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     if (!m_backingStore && !m_imageBackingStore && !m_contentsBuffer && !m_contentsSolidColor)
         return;
 
+    if (m_mask)
+	canvas.saveLayer(nullptr, nullptr);
+
     canvas.save();
     canvas.concat(SkM44(m_transforms.combined));
 
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
     paint.setAlphaf(context.opacity);
+    if (context.isMask)
+        paint.setBlendMode(SkBlendMode::kDstIn);
 
     if (m_backingStore)
         m_backingStore->paintToCanvas(canvas, paint);
@@ -190,6 +198,13 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     }
 
     canvas.restore();
+
+    if (m_mask) {
+        SetForScope scopedMask(context.isMask, true);
+        m_mask->paintSelf(canvas, context);
+
+        canvas.restore();
+    }
 }
 
 void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& context)

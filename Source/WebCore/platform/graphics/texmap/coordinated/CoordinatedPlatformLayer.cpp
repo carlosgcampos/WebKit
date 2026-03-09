@@ -1233,7 +1233,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::Mask)) {
-            notImplemented();
+            layer.setMask(m_mask ? &m_mask->ensureSkiaTarget() : nullptr);
             m_pendingChanges.remove(Change::Mask);
         }
 
