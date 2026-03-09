@@ -1183,7 +1183,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::Preserves3D)) {
-            notImplemented();
+            layer.setPreserves3D(m_preserves3D);
             m_pendingChanges.remove(Change::Preserves3D);
         }
 
@@ -1193,7 +1193,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::BackfaceVisibility)) {
-            notImplemented();
+            layer.setBackfaceVisibility(m_backfaceVisibility);
             m_pendingChanges.remove(Change::BackfaceVisibility);
         }
 
@@ -1208,7 +1208,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::ContentsVisible)) {
-            notImplemented();
+            layer.setContentsVisible(m_contentsVisible);
             m_pendingChanges.remove(Change::ContentsVisible);
         }
 
