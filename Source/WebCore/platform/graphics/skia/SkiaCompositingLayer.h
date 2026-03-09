@@ -73,6 +73,10 @@ public:
     void setContentsBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&&);
     void setContentsSolidColor(const Color&);
 
+    bool isLeafOf3DRenderingContext() const { return !m_preserves3D && (m_parent && m_parent->m_preserves3D); }
+    const TransformationMatrix& toSurfaceTransform() const { return m_transforms.combined; }
+    FloatRect effectiveLayerRect() const { return FloatRect({ }, m_size); }
+
     void computeTransforms(SkiaCompositingLayer* = nullptr);
     void paint(SkCanvas&);
 
@@ -81,6 +85,7 @@ private:
 
     void removeFromParent();
     bool isVisible() const;
+    bool hasVisualContent() const;
 
     struct PaintContext {
         float opacity { 1 };
@@ -90,6 +95,8 @@ private:
     void recursivePaint(SkCanvas&, PaintContext&);
     void paintSelf(SkCanvas&, PaintContext&);
     void paintSelfAndChildren(SkCanvas&, PaintContext&);
+    void paintWith3DRenderingContext(SkCanvas&, PaintContext&);
+    void collect3DRenderingContextLayers(Vector<SkiaCompositingLayer*>&);
 
     Vector<Ref<SkiaCompositingLayer>> m_children;
     WeakPtr<SkiaCompositingLayer> m_parent;
