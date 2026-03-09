@@ -263,12 +263,12 @@ bool SkiaCompositingLayer::hasVisualContent() const
         || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible());
 }
 
-void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<SkiaCompositingLayer*>& layers)
+void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>& layers)
 {
     if (m_preserves3D || isLeafOf3DRenderingContext()) {
         // Add layers to 3d rendering context only if they get actually painted.
         if (isVisible() && (hasVisualContent() || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
-            layers.append(this);
+            layers.append(Ref { *this });
 
         // Stop recursion on 3d rendering context leaf
         if (isLeafOf3DRenderingContext())
@@ -281,7 +281,7 @@ void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<SkiaCompositin
 
 void SkiaCompositingLayer::paintWith3DRenderingContext(SkCanvas& canvas, PaintContext& context)
 {
-    Vector<SkiaCompositingLayer*> layers;
+    Vector<Ref<SkiaCompositingLayer>> layers;
     collect3DRenderingContextLayers(layers);
 
     SkiaCompositingLayer3DRenderingContext renderingContext;
