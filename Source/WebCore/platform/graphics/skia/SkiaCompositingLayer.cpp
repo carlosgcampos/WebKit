@@ -120,6 +120,22 @@ void SkiaCompositingLayer::setContentsSolidColor(const Color& color)
     m_contentsSolidColor = color;
 }
 
+void SkiaCompositingLayer::setMask(RefPtr<SkiaCompositingLayer>&& mask)
+{
+    if (mask)
+        mask->m_effectTarget = m_isReplica ? m_effectTarget : *this;
+    m_mask = WTF::move(mask);
+}
+
+void SkiaCompositingLayer::setReplica(RefPtr<SkiaCompositingLayer>&& replica)
+{
+    if (replica) {
+        replica->m_isReplica = true;
+        replica->m_effectTarget = *this;
+    }
+    m_replica = WTF::move(replica);
+}
+
 void SkiaCompositingLayer::computeTransforms(SkiaCompositingLayer* parent)
 {
     m_transforms.local = m_transform;
@@ -128,6 +144,8 @@ void SkiaCompositingLayer::computeTransforms(SkiaCompositingLayer* parent)
         TransformationMatrix parentTransform;
         if (parent)
             parentTransform = parent->m_transforms.combinedForChildren;
+        else if (m_effectTarget)
+            parentTransform = m_effectTarget->m_transforms.combined;
 
         FloatPoint origin(m_anchorPoint.x(), m_anchorPoint.y());
         origin.scale(m_size.width(), m_size.height());
@@ -139,6 +157,9 @@ void SkiaCompositingLayer::computeTransforms(SkiaCompositingLayer* parent)
         m_transforms.combinedForChildren = m_transforms.combined;
         m_transforms.combined.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
 
+        if (m_isReplica)
+            m_transforms.combined.translate(-m_position.x(), -m_position.y());
+
         if (!m_preserves3D)
             m_transforms.combinedForChildren.flatten();
         m_transforms.combinedForChildren.multiply(m_childrenTransform);
@@ -149,6 +170,8 @@ void SkiaCompositingLayer::computeTransforms(SkiaCompositingLayer* parent)
 
     if (m_mask)
         m_mask->computeTransforms(this);
+    if (m_replica)
+        m_replica->computeTransforms();
 
     for (auto& child : m_children)
         child->computeTransforms(this);
@@ -257,6 +280,24 @@ bool SkiaCompositingLayer::isVisible() const
     return true;
 }
 
+TransformationMatrix SkiaCompositingLayer::replicaTransform() const
+{
+    return TransformationMatrix(m_replica->m_transforms.combined)
+        .multiply(m_transforms.combined.inverse().value_or(TransformationMatrix()));
+}
+
+void SkiaCompositingLayer::paintSelfAndChildrenWithReplica(SkCanvas& canvas, PaintContext& context)
+{
+    if (m_replica) {
+        canvas.save();
+        canvas.concat(SkM44(replicaTransform()));
+        paintSelfAndChildren(canvas, context);
+        canvas.restore();
+    }
+
+    paintSelfAndChildren(canvas, context);
+}
+
 void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& context)
 {
     if (!isVisible())
@@ -269,17 +310,40 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
         return;
     }
 
-    if (m_mask)
-        canvas.saveLayer(nullptr, nullptr);
+    bool hasMask = !!m_mask;
+    bool hasReplicaMask = m_replica && m_replica->m_mask;
 
-    paintSelfAndChildren(canvas, context);
+    if (hasMask || hasReplicaMask) {
+        // Paint replica with its own mask (if any).
+        if (m_replica) {
+            if (hasReplicaMask)
+                canvas.saveLayer(nullptr, nullptr);
 
-    if (m_mask) {
-        SetForScope scopedMask(context.isMask, true);
-        m_mask->paintSelf(canvas, context);
+            canvas.save();
+            canvas.concat(SkM44(replicaTransform()));
+            paintSelfAndChildren(canvas, context);
+            canvas.restore();
 
-        canvas.restore();
-    }
+            if (hasReplicaMask) {
+                SetForScope scopedMask(context.isMask, true);
+                m_replica->m_mask->paintSelf(canvas, context);
+                canvas.restore();
+            }
+        }
+
+        // Paint original with its own mask.
+        if (hasMask)
+            canvas.saveLayer(nullptr, nullptr);
+
+        paintSelfAndChildren(canvas, context);
+
+        if (hasMask) {
+            SetForScope scopedMask(context.isMask, true);
+            m_mask->paintSelf(canvas, context);
+            canvas.restore();
+        }
+    } else
+        paintSelfAndChildrenWithReplica(canvas, context);
 }
 
 bool SkiaCompositingLayer::hasVisualContent() const
