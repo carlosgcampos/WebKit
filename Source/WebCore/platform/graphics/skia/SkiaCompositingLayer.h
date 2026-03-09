@@ -73,7 +73,6 @@ public:
     void setContentsBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&&);
     void setContentsSolidColor(const Color&);
 
-    bool isLeafOf3DRenderingContext() const { return !m_preserves3D && (m_parent && m_parent->m_preserves3D); }
     const TransformationMatrix& toSurfaceTransform() const { return m_transforms.combined; }
     FloatRect effectiveLayerRect() const { return FloatRect({ }, m_size); }
 
@@ -85,6 +84,7 @@ private:
 
     void removeFromParent();
     bool isVisible() const;
+    bool isLeafOf3DRenderingContext() const { return !m_preserves3D && (m_parent && m_parent->m_preserves3D); }
     bool hasVisualContent() const;
 
     struct PaintContext {

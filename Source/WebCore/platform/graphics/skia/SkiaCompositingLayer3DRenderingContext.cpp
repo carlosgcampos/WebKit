@@ -108,7 +108,7 @@ static inline bool quadsIntersect(const FloatQuad& quadA, const FloatQuad& quadB
     return true; // No separating axis found
 }
 
-WTF_MAKE_TZONE_ALLOCATED_IMPL(SkiaCompositingLayer3DRenderingContext);
+WTF_MAKE_STRUCT_TZONE_ALLOCATED_IMPL(SkiaCompositingLayer3DRenderingContext::LayerNode);
 
 void SkiaCompositingLayer3DRenderingContext::paint(const Vector<Ref<SkiaCompositingLayer>>& compositingLayers,
     const std::function<void(SkiaCompositingLayer&, std::optional<SkPath>)>& paintLayerFunction)
@@ -126,8 +126,8 @@ void SkiaCompositingLayer3DRenderingContext::paint(const Vector<Ref<SkiaComposit
     // Perform a broad-phase sweep-and-prune to identify potential intersections.
     // By determining which layers might intersect, we can limit BSP cutting planes to those areas only,
     // preventing unnecessary splitting of layers that are spatially distant.
-    // This optimization matters because the TextureMapper uses stencil operations to render split layers,
-    // and on some hardware, stencil usage is slow. Reducing unnecessary splits helps improve performance.
+    // Reducing unnecessary splits helps improve performance, as each split layer fragment requires
+    // an additional clip path and paint call.
     auto potentialIntersections = sweepAndPrune(layers);
 
     // Determine if any layer pairs intersect on the ZY plane. An intersection implies that the rendering
@@ -215,7 +215,7 @@ SkiaCompositingLayer3DRenderingContext::BoundingBox SkiaCompositingLayer3DRender
 
 SkiaCompositingLayer3DRenderingContext::SweepAndPrunePairs SkiaCompositingLayer3DRenderingContext::sweepAndPrune(const Vector<Layer>& layers)
 {
-    std::vector<size_t> indices(layers.size());
+    Vector<size_t> indices(layers.size());
     std::iota(indices.begin(), indices.end(), 0);
 
     // Sort left to right along axis
