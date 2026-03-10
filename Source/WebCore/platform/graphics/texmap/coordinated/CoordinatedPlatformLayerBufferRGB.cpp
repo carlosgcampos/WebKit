@@ -28,11 +28,13 @@
 
 #if USE(COORDINATED_GRAPHICS)
 #include "BitmapTexture.h"
+#include "ColorMatrix.h"
 #include "PlatformDisplay.h"
 #include "TextureMapper.h"
 
 #if USE(SKIA)
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+#include <skia/core/SkColorFilter.h>
 #include <skia/core/SkImage.h>
 #include <skia/gpu/ganesh/GrBackendSurface.h>
 #include <skia/gpu/ganesh/SkImageGanesh.h>
@@ -88,7 +90,13 @@ void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const Fl
     externalTexture.fFormat = GL_RGBA8;
     auto backendTexture = GrBackendTextures::MakeGL(m_size.width(), m_size.height(), skgpu::Mipmapped::kNo, externalTexture);
     sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
-    canvas.drawImageRect(image, SkRect::MakeWH(m_size.width(), m_size.height()), targetRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &paint, SkCanvas::kFast_SrcRectConstraint);
+
+    auto imagePaint = paint;
+    if (m_texture && m_texture->colorConvertFlags().contains(TextureMapperFlags::ShouldConvertTextureBGRAToRGBA)) {
+        const auto matrix = swapRedBlueMatrix();
+        imagePaint.setColorFilter(SkColorFilters::Matrix(matrix.data().data()));
+    }
+    canvas.drawImageRect(image, SkRect::MakeWH(m_size.width(), m_size.height()), targetRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &imagePaint, SkCanvas::kFast_SrcRectConstraint);
 }
 #endif
 
