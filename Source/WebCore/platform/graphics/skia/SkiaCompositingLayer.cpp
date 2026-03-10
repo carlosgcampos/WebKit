@@ -34,7 +34,9 @@
 #include "CoordinatedPlatformLayerBuffer.h"
 #include "CoordinatedTileBuffer.h"
 #include "FilterOperations.h"
+#include "Region.h"
 #include "SkiaCompositingLayer3DRenderingContext.h"
+#include "SkiaCompositingLayerOverlapRegions.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkColorFilter.h>
 #include <skia/core/SkPathBuilder.h>
@@ -357,18 +359,8 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithReplica(SkCanvas& canvas, Pai
     paintSelfAndChildren(canvas, context);
 }
 
-void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& context)
+void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas& canvas, PaintContext& context)
 {
-    if (!isVisible())
-        return;
-
-    SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
-
-    if (m_preserves3D) {
-        paintWith3DRenderingContext(canvas, context);
-        return;
-    }
-
     bool hasMask = !!m_mask;
     bool hasReplicaMask = m_replica && m_replica->m_mask;
 
@@ -417,6 +409,79 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
         paintSelfAndChildrenWithReplica(canvas, context);
 }
 
+void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& context)
+{
+    if (!isVisible())
+        return;
+
+    SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
+
+    if (m_preserves3D) {
+        paintUsing3DRenderingContext(canvas, context);
+        return;
+    }
+
+    if (m_opacity < 1)
+        paintUsingOverlapRegions(canvas, context);
+    else
+        paintSelfAndChildrenWithReplicaFilterAndMask(canvas, context);
+}
+
+void SkiaCompositingLayer::computeOverlapRegions(ComputeOverlapRegionData& data, const TransformationMatrix& accumulatedReplicaTransform, IncludesReplica includesReplica)
+{
+    if (!m_visible || !m_contentsVisible)
+        return;
+
+    FloatRect localBoundingRect;
+    if (m_backingStore || m_masksToBounds || m_mask)
+        localBoundingRect = effectiveLayerRect();
+    else if (m_contentsBuffer || m_imageBackingStore || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()))
+        localBoundingRect = m_contentsRect;
+
+    TransformationMatrix transform(accumulatedReplicaTransform);
+    transform.multiply(m_transforms.combined);
+
+    auto viewportBoundingRect = data.transformedBoundingBox(transform, localBoundingRect);
+
+    switch (data.mode) {
+    case ComputeOverlapRegionMode::Intersection:
+        data.resolveOverlaps(viewportBoundingRect);
+        break;
+    case ComputeOverlapRegionMode::Union:
+    case ComputeOverlapRegionMode::Mask:
+        data.overlapRegion.unite(viewportBoundingRect);
+        break;
+    }
+
+    if (m_replica && includesReplica == IncludesReplica::Yes) {
+        TransformationMatrix newReplicaTransform(accumulatedReplicaTransform);
+        newReplicaTransform.multiply(replicaTransform());
+        computeOverlapRegions(data, newReplicaTransform, IncludesReplica::No);
+    }
+
+    if (!m_masksToBounds && data.mode != ComputeOverlapRegionMode::Mask) {
+        for (auto& child : m_children)
+            child->computeOverlapRegions(data, accumulatedReplicaTransform);
+    }
+}
+
+void SkiaCompositingLayer::paintUsingOverlapRegions(SkCanvas& canvas, PaintContext& context)
+{
+    ComputeOverlapRegionData data {
+        .mode = ComputeOverlapRegionMode::Intersection,
+        .clipBounds = canvas.getDeviceClipBounds(),
+        .overlapRegion = { },
+        .nonOverlapRegion = { }
+    };
+    computeOverlapRegions(data);
+
+    SkiaCompositingLayerOverlapRegions::paint(canvas, context.opacity, data,
+        [&](float effectiveOpacity) {
+            SetForScope scopedOpacity(context.opacity, effectiveOpacity);
+            paintSelfAndChildrenWithReplicaFilterAndMask(canvas, context);
+        });
+}
+
 bool SkiaCompositingLayer::hasVisualContent() const
 {
     // FIXME: hasFilters() / hasBackdrop() conditions
@@ -441,7 +506,7 @@ void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<Ref<SkiaCompos
         child->collect3DRenderingContextLayers(layers);
 }
 
-void SkiaCompositingLayer::paintWith3DRenderingContext(SkCanvas& canvas, PaintContext& context)
+void SkiaCompositingLayer::paintUsing3DRenderingContext(SkCanvas& canvas, PaintContext& context)
 {
     Vector<Ref<SkiaCompositingLayer>> layers;
     collect3DRenderingContextLayers(layers);
