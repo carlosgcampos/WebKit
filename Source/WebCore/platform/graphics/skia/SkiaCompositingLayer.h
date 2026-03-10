@@ -89,6 +89,7 @@ private:
     void removeFromParent();
     bool isVisible() const;
     bool isLeafOf3DRenderingContext() const { return !m_preserves3D && (m_parent && m_parent->m_preserves3D); }
+    bool isReplica() const { return !!m_replicatedLayer; }
     bool hasVisualContent() const;
 
     struct PaintContext {
@@ -123,8 +124,7 @@ private:
     float m_opacity { 1 };
     RefPtr<SkiaCompositingLayer> m_mask;
     RefPtr<SkiaCompositingLayer> m_replica;
-    WeakPtr<SkiaCompositingLayer> m_effectTarget;
-    bool m_isReplica { false };
+    WeakPtr<SkiaCompositingLayer> m_replicatedLayer;
     RefPtr<CoordinatedBackingStore> m_backingStore;
     RefPtr<CoordinatedAnimatedBackingStoreClient> m_animatedBackingStoreClient;
     RefPtr<CoordinatedImageBackingStore> m_imageBackingStore;
