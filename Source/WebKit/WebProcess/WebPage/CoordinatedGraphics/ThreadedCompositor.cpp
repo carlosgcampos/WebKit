@@ -360,13 +360,16 @@ void ThreadedCompositor::paintToSkiaCanvas(const TransformationMatrix& matrix, c
     display.skiaGLContext()->makeContextCurrent();
 
     canvas->save();
-    rootLayer.paint(*canvas);
+    bool sceneHasRunningAnimations = rootLayer.paint(*canvas);
     canvas->restore();
 
     if (auto* surface = canvas->getSurface())
         display.skiaGrContext()->flushAndSubmit(surface, GrSyncCpu::kNo);
 
     m_context->makeContextCurrent();
+
+    if (sceneHasRunningAnimations)
+        requestComposition(CompositionReason::Animation);
 }
 
 #if HAVE(OS_SIGNPOST) || USE(SYSPROF_CAPTURE)

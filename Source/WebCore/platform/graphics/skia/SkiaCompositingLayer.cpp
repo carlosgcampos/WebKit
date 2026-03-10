@@ -191,17 +191,64 @@ static sk_sp<SkImageFilter> createFilter(const FilterOperation& filterOperation,
     return nullptr;
 }
 
-void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
+static sk_sp<SkImageFilter> createFilters(const FilterOperations& filterOperations)
 {
     sk_sp<SkImageFilter> filter;
     for (const auto& filterOperation : filterOperations)
         filter = createFilter(filterOperation, filter);
-    m_filter = WTF::move(filter);
+    return filter;
 }
 
-void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent)
+void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
 {
-    m_transforms.local = m_transform;
+    m_filter = createFilters(filterOperations);
+}
+
+const TransformationMatrix& SkiaCompositingLayer::localTransform() const
+{
+    if (!m_animationsState || !m_animationsState->isRunning)
+        return m_transform;
+
+    return m_animationsState->transform ? m_animationsState->transform.value() : m_transform;
+}
+
+float SkiaCompositingLayer::opacity() const
+{
+    if (!m_animationsState || !m_animationsState->isRunning)
+        return m_opacity;
+
+    return m_animationsState->opacity.value_or(m_opacity);
+}
+
+sk_sp<SkImageFilter> SkiaCompositingLayer::filter() const
+{
+    if (!m_animationsState || !m_animationsState->isRunning)
+        return m_filter;
+
+    return m_animationsState->filter ? m_animationsState->filter : m_filter;
+}
+
+std::optional<SkiaCompositingLayer::AnimationsState> SkiaCompositingLayer::syncAnimations(MonotonicTime time)
+{
+    if (m_animations.isEmpty())
+        return std::nullopt;
+
+    TextureMapperAnimation::ApplicationResult applicationResults;
+    m_animations.apply(applicationResults, time);
+
+    AnimationsState state;
+    state.transform = applicationResults.transform;
+    state.opacity = applicationResults.opacity;
+    if (applicationResults.filters)
+        state.filter = createFilters(*applicationResults.filters);
+    state.isRunning = applicationResults.hasRunningAnimations;
+    return state;
+}
+
+bool SkiaCompositingLayer::computeTransformsAndAnimations(RefPtr<SkiaCompositingLayer> parent, MonotonicTime time)
+{
+    m_animationsState = syncAnimations(time);
+    bool hasRunningAnimations = m_animationsState ? m_animationsState->isRunning : false;
 
     if (!m_size.isEmpty() || !m_masksToBounds) {
         TransformationMatrix parentTransform;
@@ -213,7 +260,7 @@ void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent
         m_transforms.combined = parentTransform;
         m_transforms.combined
             .translate3d(origin.x() + (m_position.x() - m_boundsOrigin.x()), origin.y() + (m_position.y() - m_boundsOrigin.y()), m_anchorPoint.z())
-            .multiply(m_transforms.local);
+            .multiply(localTransform());
 
         m_transforms.combinedForChildren = m_transforms.combined;
         m_transforms.combined.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
@@ -235,19 +282,27 @@ void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent
     }
 
     if (m_mask)
-        m_mask->computeTransforms(m_replicatedLayer ? m_replicatedLayer.get() : this);
+        hasRunningAnimations |= m_mask->computeTransformsAndAnimations(m_replicatedLayer ? m_replicatedLayer.get() : this, time);
     if (m_replica)
-        m_replica->computeTransforms(m_replica->m_replicatedLayer);
+        hasRunningAnimations |= m_replica->computeTransformsAndAnimations(m_replica->m_replicatedLayer, time);
 
     for (auto& child : m_children)
-        child->computeTransforms(this);
+        hasRunningAnimations |= child->computeTransformsAndAnimations(this, time);
+
+    // If the layer is invisible because of opacity and there's no opacity animation, the content won't
+    // be visible ever, so triggering repaints doesn't make sense.
+    if (!m_opacity && !(m_animationsState && m_animationsState->opacity))
+        return false;
+
+    return hasRunningAnimations;
 }
 
-void SkiaCompositingLayer::paint(SkCanvas& canvas)
+bool SkiaCompositingLayer::paint(SkCanvas& canvas)
 {
-    computeTransforms();
+    bool hasRunningAnimations = computeTransformsAndAnimations(nullptr, MonotonicTime::now());
     PaintContext context;
     recursivePaint(canvas, context);
+    return hasRunningAnimations;
 }
 
 void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
@@ -336,7 +391,7 @@ bool SkiaCompositingLayer::isVisible() const
         return false;
     if (!hasVisualContent() && m_children.isEmpty())
         return false;
-    if (m_opacity < cOpacityVisibilityThreshold)
+    if (opacity() < cOpacityVisibilityThreshold)
         return false;
     return true;
 }
@@ -363,14 +418,15 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas
 {
     bool hasMask = !!m_mask;
     bool hasReplicaMask = m_replica && m_replica->m_mask;
+    auto filter = this->filter();
 
-    if (hasMask || hasReplicaMask || m_filter) {
+    if (hasMask || hasReplicaMask || filter) {
         // Paint replica with its own mask (if any).
         if (m_replica) {
-            if (hasReplicaMask || m_filter) {
+            if (hasReplicaMask || filter) {
                 SkPaint paint;
                 paint.setStyle(SkPaint::kFill_Style);
-                paint.setImageFilter(m_filter);
+                paint.setImageFilter(filter);
                 canvas.saveLayer(nullptr, &paint);
             }
 
@@ -384,15 +440,15 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas
                 m_replica->m_mask->paintSelf(canvas, context);
             }
 
-            if (hasReplicaMask || m_filter)
+            if (hasReplicaMask || filter)
                 canvas.restore();
         }
 
         // Paint original with its own mask.
-        if (hasMask || m_filter) {
+        if (hasMask || filter) {
             SkPaint paint;
             paint.setStyle(SkPaint::kFill_Style);
-            paint.setImageFilter(m_filter);
+            paint.setImageFilter(filter);
             canvas.saveLayer(nullptr, &paint);
         }
 
@@ -403,7 +459,7 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas
             m_mask->paintSelf(canvas, context);
         }
 
-        if (hasMask || m_filter)
+        if (hasMask || filter)
             canvas.restore();
     } else
         paintSelfAndChildrenWithReplica(canvas, context);
@@ -414,14 +470,14 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
     if (!isVisible())
         return;
 
-    SetForScope scopedOpacity(context.opacity, context.opacity * m_opacity);
+    SetForScope scopedOpacity(context.opacity, context.opacity * opacity());
 
     if (m_preserves3D) {
         paintUsing3DRenderingContext(canvas, context);
         return;
     }
 
-    if (m_opacity < 1)
+    if (opacity() < 1)
         paintUsingOverlapRegions(canvas, context);
     else
         paintSelfAndChildrenWithReplicaFilterAndMask(canvas, context);
@@ -494,7 +550,7 @@ void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<Ref<SkiaCompos
 {
     if (m_preserves3D || isLeafOf3DRenderingContext()) {
         // Add layers to 3d rendering context only if they get actually painted.
-        if (isVisible() && (hasVisualContent() || m_filter || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
+        if (isVisible() && (hasVisualContent() || filter() || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
             layers.append(Ref { *this });
 
         // Stop recursion on 3d rendering context leaf
