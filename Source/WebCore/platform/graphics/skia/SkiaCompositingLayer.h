@@ -36,6 +36,7 @@
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkCanvas.h>
 #include <skia/core/SkM44.h>
+#include <skia/effects/SkImageFilters.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #include <wtf/RefCountedAndCanMakeWeakPtr.h>
 #include <wtf/TZoneMalloc.h>
@@ -45,6 +46,7 @@ class CoordinatedAnimatedBackingStoreClient;
 class CoordinatedBackingStore;
 class CoordinatedImageBackingStore;
 class CoordinatedPlatformLayerBuffer;
+class FilterOperations;
 
 class SkiaCompositingLayer final : public RefCountedAndCanMakeWeakPtr<SkiaCompositingLayer> {
     WTF_MAKE_TZONE_ALLOCATED(SkiaCompositingLayer);
@@ -76,6 +78,7 @@ public:
     void setImageBackingStore(CoordinatedImageBackingStore*);
     void setContentsBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&&);
     void setContentsSolidColor(const Color&);
+    void setFilters(const FilterOperations&);
 
     const TransformationMatrix& toSurfaceTransform() const { return m_transforms.combined; }
     FloatRect effectiveLayerRect() const { return FloatRect({ }, m_size); }
@@ -130,6 +133,7 @@ private:
     RefPtr<CoordinatedImageBackingStore> m_imageBackingStore;
     std::unique_ptr<CoordinatedPlatformLayerBuffer> m_contentsBuffer;
     Color m_contentsSolidColor;
+    sk_sp<SkImageFilter> m_filter;
     struct {
         TransformationMatrix local;
         TransformationMatrix combined;
