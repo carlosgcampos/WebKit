@@ -1273,7 +1273,11 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::DebugIndicators)) {
-            notImplemented();
+            layer.setShowRepaintCounter(m_repaintCount != -1);
+            layer.setRepaintCount(m_repaintCount);
+            layer.setShowDebugBorder(m_debugBorderColor.isVisible());
+            layer.setDebugBorderColor(m_debugBorderColor);
+            layer.setDebugBorderWidth(m_debugBorderWidth);
             m_pendingChanges.remove(Change::DebugIndicators);
         }
 
