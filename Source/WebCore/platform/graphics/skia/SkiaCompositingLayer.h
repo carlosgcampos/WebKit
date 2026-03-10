@@ -72,6 +72,8 @@ public:
     void setOpacity(float opacity) { m_opacity = opacity; }
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
     void setAnimations(const TextureMapperAnimations& animations) { m_animations = animations; }
+    void setContentsTileSize(const FloatSize& size) { m_contentsTileSize = size; }
+    void setContentsTilePhase(const FloatSize& phase) { m_contentsTilePhase = phase; }
     void setMask(RefPtr<SkiaCompositingLayer>&&);
     void setReplica(RefPtr<SkiaCompositingLayer>&&);
     void setFilters(const FilterOperations&);
@@ -136,6 +138,8 @@ private:
     FloatPoint3D m_anchorPoint { 0.5f, 0.5f, 0 };
     FloatPoint m_boundsOrigin;
     FloatRect m_contentsRect;
+    FloatSize m_contentsTileSize;
+    FloatSize m_contentsTilePhase;
     TransformationMatrix m_transform;
     TransformationMatrix m_childrenTransform;
     bool m_preserves3D { false };
