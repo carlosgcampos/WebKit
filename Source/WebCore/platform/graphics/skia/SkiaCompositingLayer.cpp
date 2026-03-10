@@ -136,43 +136,46 @@ void SkiaCompositingLayer::setReplica(RefPtr<SkiaCompositingLayer>&& replica)
         m_replica->m_replicatedLayer = this;
 }
 
-static sk_sp<SkColorFilter> createColorFilter(const FilterOperation& filterOperation)
+static sk_sp<SkImageFilter> createFilter(const FilterOperation& filterOperation, sk_sp<SkImageFilter> input)
 {
     switch (filterOperation.type()) {
     case FilterOperation::Type::Grayscale: {
         ColorMatrix<5, 4> matrix(grayscaleColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
     case FilterOperation::Type::Sepia: {
         ColorMatrix<5, 4> matrix(sepiaColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
     case FilterOperation::Type::Saturate: {
         ColorMatrix<5, 4> matrix(saturationColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
     case FilterOperation::Type::HueRotate: {
         ColorMatrix<5, 4> matrix(hueRotateColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
     case FilterOperation::Type::Invert: {
         const auto matrix = invertColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount());
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
     case FilterOperation::Type::Opacity: {
         const auto matrix = opacityColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount());
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
     case FilterOperation::Type::Brightness: {
         ColorMatrix<5, 4> matrix(brightnessColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount()));
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
     case FilterOperation::Type::Contrast: {
         const auto matrix = contrastColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount());
-        return SkColorFilters::Matrix(matrix.data().data());
+        return SkImageFilters::ColorFilter(SkColorFilters::Matrix(matrix.data().data()), input);
     }
-    case FilterOperation::Type::Blur:
-        break;
+    case FilterOperation::Type::Blur: {
+        auto sigma = downcast<BlurFilterOperation>(filterOperation).stdDeviation();
+        // FIXME: do we need to add crop rect?
+        return SkImageFilters::Blur(sigma, sigma, SkTileMode::kDecal, input);
+    }
     case FilterOperation::Type::DropShadow:
         break;
     case FilterOperation::Type::Passthrough:
@@ -188,7 +191,7 @@ void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
 {
     sk_sp<SkImageFilter> filter;
     for (const auto& filterOperation : filterOperations)
-        filter = SkImageFilters::ColorFilter(createColorFilter(filterOperation), WTF::move(filter));
+        filter = createFilter(filterOperation, filter);
     m_filter = WTF::move(filter);
 }
 
