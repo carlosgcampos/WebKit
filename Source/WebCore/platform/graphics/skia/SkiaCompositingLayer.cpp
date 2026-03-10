@@ -34,11 +34,13 @@
 #include "CoordinatedPlatformLayerBuffer.h"
 #include "CoordinatedTileBuffer.h"
 #include "FilterOperations.h"
+#include "FontCache.h"
 #include "Region.h"
 #include "SkiaCompositingLayer3DRenderingContext.h"
 #include "SkiaCompositingLayerOverlapRegions.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkColorFilter.h>
+#include <skia/core/SkFont.h>
 #include <skia/core/SkPathBuilder.h>
 #include <skia/core/SkRRect.h>
 #include <skia/effects/SkImageFilters.h>
@@ -370,7 +372,64 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
             canvas.restore();
     }
 
+    if (m_showDebugBorder) {
+        SkPaint borderPaint;
+        borderPaint.setStyle(SkPaint::kStroke_Style);
+        borderPaint.setColor(SkColor(m_debugBorderColor));
+        borderPaint.setStrokeWidth(m_debugBorderWidth);
+        borderPaint.setAntiAlias(true);
+
+        if (m_backingStore)
+            canvas.drawRect(SkRect(effectiveLayerRect()), borderPaint);
+        if (m_contentsBuffer || m_imageBackingStore || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()))
+            canvas.drawRect(SkRect(m_contentsRect), borderPaint);
+    }
+
+    // Capture the full canvas-to-device position while the layer transform is still active.
+    SkPoint deviceOrigin { 0, 0 };
+    if (m_showRepaintCounter) {
+        auto mapped = canvas.getLocalToDevice().map(0, 0, 0, 1);
+        if (std::abs(mapped.w) > std::numeric_limits<float>::epsilon())
+            deviceOrigin = { mapped.x / mapped.w, mapped.y / mapped.w };
+        else
+            deviceOrigin = { mapped.x, mapped.y };
+    }
+
     canvas.restore();
+
+    if (m_showRepaintCounter) {
+        constexpr float pointSize = 14;
+        constexpr float padding = 3;
+        auto counterString = String::number(m_repaintCount).ascii();
+
+        static SkFont font = [] {
+            auto typeface = FontCache::forCurrentThread()->fontManager().matchFamilyStyle("monospace", SkFontStyle::Bold());
+            SkFont f(typeface, pointSize);
+            f.setEdging(SkFont::Edging::kAntiAlias);
+            f.setSubpixel(true);
+            return f;
+        }();
+
+        SkRect textBounds;
+        font.measureText(counterString.data(), counterString.length(), SkTextEncoding::kUTF8, &textBounds);
+        float textWidth = textBounds.width() + padding * 2;
+        float textHeight = textBounds.height() + padding * 2;
+
+        canvas.save();
+        canvas.resetMatrix();
+
+        SkPaint backgroundPaint;
+        backgroundPaint.setColor(SkColor(m_debugBorderColor));
+        backgroundPaint.setStyle(SkPaint::kFill_Style);
+        canvas.drawRect(SkRect::MakeXYWH(deviceOrigin.x(), deviceOrigin.y(), textWidth, textHeight), backgroundPaint);
+
+        SkPaint textPaint;
+        textPaint.setColor(SK_ColorWHITE);
+        textPaint.setAntiAlias(true);
+        canvas.drawString(counterString.data(), deviceOrigin.x() + padding, deviceOrigin.y() - textBounds.fTop + padding, font, textPaint);
+
+        canvas.restore();
+    }
 }
 
 void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& context)
