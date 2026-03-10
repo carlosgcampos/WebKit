@@ -22,6 +22,7 @@
 
 #if USE(COORDINATED_GRAPHICS)
 #include "BitmapTexture.h"
+#include "ColorMatrix.h"
 #include "CoordinatedTileBuffer.h"
 #include "GraphicsLayer.h"
 #include "PlatformDisplay.h"
@@ -137,6 +138,7 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
     auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
 
     sk_sp<SkColorFilter> bgraFilter;
+    auto tilePaint = paint;
     for (const auto& tile : m_tiles.values()) {
         auto& texture = tile.texture();
 
@@ -148,19 +150,14 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
         auto backendTexture = GrBackendTextures::MakeGL(size.width(), size.height(), skgpu::Mipmapped::kNo, externalTexture);
         sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
 
-        auto tilePaint = paint;
         if (texture.colorConvertFlags().contains(TextureMapperFlags::ShouldConvertTextureBGRAToRGBA)) {
             if (!bgraFilter) {
-                constexpr std::array<float, 20> swapRedBlue = {
-                    0, 0, 1, 0, 0,
-                    0, 1, 0, 0, 0,
-                    1, 0, 0, 0, 0,
-                    0, 0, 0, 1, 0,
-                };
-                bgraFilter = SkColorFilters::Matrix(swapRedBlue.data());
+                const auto matrix = swapRedBlueMatrix();
+                bgraFilter = SkColorFilters::Matrix(matrix.data().data());
             }
             tilePaint.setColorFilter(bgraFilter);
-        }
+        } else
+            tilePaint.setColorFilter(nullptr);
         canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &tilePaint, SkCanvas::kFast_SrcRectConstraint);
     }
 }
