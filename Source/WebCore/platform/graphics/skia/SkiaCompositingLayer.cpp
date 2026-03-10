@@ -27,15 +27,19 @@
 #include "SkiaCompositingLayer.h"
 
 #if USE(SKIA)
+#include "ColorMatrix.h"
 #include "CoordinatedAnimatedBackingStoreClient.h"
 #include "CoordinatedBackingStore.h"
 #include "CoordinatedImageBackingStore.h"
 #include "CoordinatedPlatformLayerBuffer.h"
 #include "CoordinatedTileBuffer.h"
+#include "FilterOperations.h"
 #include "SkiaCompositingLayer3DRenderingContext.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+#include <skia/core/SkColorFilter.h>
 #include <skia/core/SkPathBuilder.h>
 #include <skia/core/SkRRect.h>
+#include <skia/effects/SkImageFilters.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #include <wtf/SetForScope.h>
 #include <wtf/TZoneMallocInlines.h>
@@ -130,6 +134,62 @@ void SkiaCompositingLayer::setReplica(RefPtr<SkiaCompositingLayer>&& replica)
     m_replica = WTF::move(replica);
     if (m_replica)
         m_replica->m_replicatedLayer = this;
+}
+
+static sk_sp<SkColorFilter> createColorFilter(const FilterOperation& filterOperation)
+{
+    switch (filterOperation.type()) {
+    case FilterOperation::Type::Grayscale: {
+        ColorMatrix<5, 4> matrix(grayscaleColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::Sepia: {
+        ColorMatrix<5, 4> matrix(sepiaColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::Saturate: {
+        ColorMatrix<5, 4> matrix(saturationColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::HueRotate: {
+        ColorMatrix<5, 4> matrix(hueRotateColorMatrix(downcast<BasicColorMatrixFilterOperation>(filterOperation).amount()));
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::Invert: {
+        const auto matrix = invertColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount());
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::Opacity: {
+        const auto matrix = opacityColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount());
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::Brightness: {
+        ColorMatrix<5, 4> matrix(brightnessColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount()));
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::Contrast: {
+        const auto matrix = contrastColorMatrix(downcast<BasicComponentTransferFilterOperation>(filterOperation).amount());
+        return SkColorFilters::Matrix(matrix.data().data());
+    }
+    case FilterOperation::Type::Blur:
+        break;
+    case FilterOperation::Type::DropShadow:
+        break;
+    case FilterOperation::Type::Passthrough:
+    case FilterOperation::Type::Default:
+    case FilterOperation::Type::None:
+        break;
+    }
+
+    return nullptr;
+}
+
+void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
+{
+    sk_sp<SkImageFilter> filter;
+    for (const auto& filterOperation : filterOperations)
+        filter = SkImageFilters::ColorFilter(createColorFilter(filterOperation), WTF::move(filter));
+    m_filter = WTF::move(filter);
 }
 
 void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent)
@@ -307,11 +367,15 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
     bool hasMask = !!m_mask;
     bool hasReplicaMask = m_replica && m_replica->m_mask;
 
-    if (hasMask || hasReplicaMask) {
+    if (hasMask || hasReplicaMask || m_filter) {
         // Paint replica with its own mask (if any).
         if (m_replica) {
-            if (hasReplicaMask)
-                canvas.saveLayer(nullptr, nullptr);
+            if (hasReplicaMask || m_filter) {
+                SkPaint paint;
+                paint.setStyle(SkPaint::kFill_Style);
+                paint.setImageFilter(m_filter);
+                canvas.saveLayer(nullptr, &paint);
+            }
 
             canvas.save();
             canvas.concat(SkM44(replicaTransform()));
@@ -321,21 +385,29 @@ void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& contex
             if (hasReplicaMask) {
                 SetForScope scopedMask(context.isMask, true);
                 m_replica->m_mask->paintSelf(canvas, context);
-                canvas.restore();
             }
+
+            if (hasReplicaMask || m_filter)
+                canvas.restore();
         }
 
         // Paint original with its own mask.
-        if (hasMask)
-            canvas.saveLayer(nullptr, nullptr);
+        if (hasMask || m_filter) {
+            SkPaint paint;
+            paint.setStyle(SkPaint::kFill_Style);
+            paint.setImageFilter(m_filter);
+            canvas.saveLayer(nullptr, &paint);
+        }
 
         paintSelfAndChildren(canvas, context);
 
         if (hasMask) {
             SetForScope scopedMask(context.isMask, true);
             m_mask->paintSelf(canvas, context);
-            canvas.restore();
         }
+
+        if (hasMask || m_filter)
+            canvas.restore();
     } else
         paintSelfAndChildrenWithReplica(canvas, context);
 }
@@ -352,7 +424,7 @@ void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<Ref<SkiaCompos
 {
     if (m_preserves3D || isLeafOf3DRenderingContext()) {
         // Add layers to 3d rendering context only if they get actually painted.
-        if (isVisible() && (hasVisualContent() || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
+        if (isVisible() && (hasVisualContent() || m_filter || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
             layers.append(Ref { *this });
 
         // Stop recursion on 3d rendering context leaf
