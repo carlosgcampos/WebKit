@@ -176,8 +176,10 @@ static sk_sp<SkImageFilter> createFilter(const FilterOperation& filterOperation,
         // FIXME: do we need to add crop rect?
         return SkImageFilters::Blur(sigma, sigma, SkTileMode::kDecal, input);
     }
-    case FilterOperation::Type::DropShadow:
-        break;
+    case FilterOperation::Type::DropShadow: {
+        auto& dropShadow = downcast<DropShadowFilterOperation>(filterOperation);
+        return SkImageFilters::DropShadow(dropShadow.x(), dropShadow.y(), dropShadow.stdDeviation(), dropShadow.stdDeviation(), dropShadow.color(), input);
+    }
     case FilterOperation::Type::Passthrough:
     case FilterOperation::Type::Default:
     case FilterOperation::Type::None:
