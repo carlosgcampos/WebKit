@@ -122,18 +122,14 @@ void SkiaCompositingLayer::setContentsSolidColor(const Color& color)
 
 void SkiaCompositingLayer::setMask(RefPtr<SkiaCompositingLayer>&& mask)
 {
-    if (mask)
-        mask->m_effectTarget = m_isReplica ? m_effectTarget : *this;
     m_mask = WTF::move(mask);
 }
 
 void SkiaCompositingLayer::setReplica(RefPtr<SkiaCompositingLayer>&& replica)
 {
-    if (replica) {
-        replica->m_isReplica = true;
-        replica->m_effectTarget = *this;
-    }
     m_replica = WTF::move(replica);
+    if (m_replica)
+        m_replica->m_replicatedLayer = this;
 }
 
 void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent)
@@ -143,9 +139,7 @@ void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent
     if (!m_size.isEmpty() || !m_masksToBounds) {
         TransformationMatrix parentTransform;
         if (parent)
-            parentTransform = parent->m_transforms.combinedForChildren;
-        else if (m_effectTarget)
-            parentTransform = m_effectTarget->m_transforms.combined;
+            parentTransform = parent == m_parent ? parent->m_transforms.combinedForChildren : parent->m_transforms.combined;
 
         FloatPoint origin(m_anchorPoint.x(), m_anchorPoint.y());
         origin.scale(m_size.width(), m_size.height());
@@ -157,29 +151,29 @@ void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent
         m_transforms.combinedForChildren = m_transforms.combined;
         m_transforms.combined.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
 
-        if (m_isReplica)
+        if (isReplica())
             m_transforms.combined.translate(-m_position.x(), -m_position.y());
 
         if (!m_preserves3D)
             m_transforms.combinedForChildren.flatten();
         m_transforms.combinedForChildren.multiply(m_childrenTransform);
         m_transforms.combinedForChildren.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
+
+        m_visible = m_backfaceVisibility || !m_transforms.combined.isBackFaceVisible();
+
+        if (m_animatedBackingStoreClient) {
+            // FIXME: use future combined.
+            m_animatedBackingStoreClient->requestBackingStoreUpdateIfNeeded(m_transforms.combined);
+        }
     }
 
-    m_visible = m_backfaceVisibility || !m_transforms.combined.isBackFaceVisible();
-
     if (m_mask)
-        m_mask->computeTransforms(this);
+        m_mask->computeTransforms(m_replicatedLayer ? m_replicatedLayer.get() : this);
     if (m_replica)
-        m_replica->computeTransforms();
+        m_replica->computeTransforms(m_replica->m_replicatedLayer);
 
     for (auto& child : m_children)
         child->computeTransforms(this);
-
-    if (m_animatedBackingStoreClient) {
-        // FIXME: use future combined.
-        m_animatedBackingStoreClient->requestBackingStoreUpdateIfNeeded(m_transforms.combined);
-    }
 }
 
 void SkiaCompositingLayer::paint(SkCanvas& canvas)
