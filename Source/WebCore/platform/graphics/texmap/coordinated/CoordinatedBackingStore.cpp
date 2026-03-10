@@ -26,10 +26,12 @@
 #include "GraphicsLayer.h"
 #include "PlatformDisplay.h"
 #include "TextureMapper.h"
+#include "TextureMapperFlags.h"
 #include <wtf/SystemTracing.h>
 
 #if USE(SKIA)
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+#include <skia/core/SkColorFilter.h>
 #include <skia/core/SkImage.h>
 #include <skia/gpu/ganesh/GrBackendSurface.h>
 #include <skia/gpu/ganesh/SkImageGanesh.h>
@@ -134,6 +136,7 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
 
     auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
 
+    sk_sp<SkColorFilter> bgraFilter;
     for (const auto& tile : m_tiles.values()) {
         auto& texture = tile.texture();
 
@@ -144,7 +147,21 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
         const auto& size = texture.size();
         auto backendTexture = GrBackendTextures::MakeGL(size.width(), size.height(), skgpu::Mipmapped::kNo, externalTexture);
         sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
-        canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &paint, SkCanvas::kFast_SrcRectConstraint);
+
+        auto tilePaint = paint;
+        if (texture.colorConvertFlags().contains(TextureMapperFlags::ShouldConvertTextureBGRAToRGBA)) {
+            if (!bgraFilter) {
+                constexpr std::array<float, 20> swapRedBlue = {
+                    0, 0, 1, 0, 0,
+                    0, 1, 0, 0, 0,
+                    1, 0, 0, 0, 0,
+                    0, 0, 0, 1, 0,
+                };
+                bgraFilter = SkColorFilters::Matrix(swapRedBlue.data());
+            }
+            tilePaint.setColorFilter(bgraFilter);
+        }
+        canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &tilePaint, SkCanvas::kFast_SrcRectConstraint);
     }
 }
 #endif
