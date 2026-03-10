@@ -1228,7 +1228,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
 #endif
 
         if (m_pendingChanges.contains(Change::Filters)) {
-            notImplemented();
+            layer.setFilters(m_filters);
             m_pendingChanges.remove(Change::Filters);
         }
 
