@@ -32,6 +32,7 @@
 #include "FloatPoint3D.h"
 #include "FloatRect.h"
 #include "FloatRoundedRect.h"
+#include "SkiaCompositingLayerOverlapRegions.h"
 #include "TransformationMatrix.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkCanvas.h>
@@ -104,9 +105,14 @@ private:
     void paintSelf(SkCanvas&, PaintContext&);
     void paintSelfAndChildren(SkCanvas&, PaintContext&);
     void paintSelfAndChildrenWithReplica(SkCanvas&, PaintContext&);
-    void paintWith3DRenderingContext(SkCanvas&, PaintContext&);
+    void paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas&, PaintContext&);
+    void paintUsingOverlapRegions(SkCanvas&, PaintContext&);
+    void paintUsing3DRenderingContext(SkCanvas&, PaintContext&);
     TransformationMatrix replicaTransform() const;
     void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
+
+    enum class IncludesReplica : bool { No, Yes };
+    void computeOverlapRegions(ComputeOverlapRegionData&, const TransformationMatrix& accumulatedReplicaTransform = { }, IncludesReplica = IncludesReplica::Yes);
 
     Vector<Ref<SkiaCompositingLayer>> m_children;
     WeakPtr<SkiaCompositingLayer> m_parent;
