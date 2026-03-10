@@ -136,7 +136,7 @@ void SkiaCompositingLayer::setReplica(RefPtr<SkiaCompositingLayer>&& replica)
     m_replica = WTF::move(replica);
 }
 
-void SkiaCompositingLayer::computeTransforms(WeakPtr<SkiaCompositingLayer> parent)
+void SkiaCompositingLayer::computeTransforms(RefPtr<SkiaCompositingLayer> parent)
 {
     m_transforms.local = m_transform;
 
