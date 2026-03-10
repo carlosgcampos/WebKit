@@ -1267,7 +1267,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::Animations)) {
-            notImplemented();
+            layer.setAnimations(m_animations);
             m_pendingChanges.remove(Change::Animations);
         }
 
