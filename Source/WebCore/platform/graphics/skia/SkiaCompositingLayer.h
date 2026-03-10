@@ -33,12 +33,14 @@
 #include "FloatRect.h"
 #include "FloatRoundedRect.h"
 #include "SkiaCompositingLayerOverlapRegions.h"
+#include "TextureMapperAnimation.h"
 #include "TransformationMatrix.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkCanvas.h>
 #include <skia/core/SkM44.h>
 #include <skia/effects/SkImageFilters.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+#include <wtf/MonotonicTime.h>
 #include <wtf/RefCountedAndCanMakeWeakPtr.h>
 #include <wtf/TZoneMalloc.h>
 
@@ -69,9 +71,10 @@ public:
     void setContentsRectClipsDescendants(bool clips) { m_contentsRectClipsDescendants = clips; }
     void setOpacity(float opacity) { m_opacity = opacity; }
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
+    void setAnimations(const TextureMapperAnimations& animations) { m_animations = animations; }
     void setMask(RefPtr<SkiaCompositingLayer>&&);
     void setReplica(RefPtr<SkiaCompositingLayer>&&);
-
+    void setFilters(const FilterOperations&);
     void setChildren(Vector<Ref<SkiaCompositingLayer>>&&);
 
     void setUseBackingStore(bool, CoordinatedAnimatedBackingStoreClient* = nullptr);
@@ -79,13 +82,11 @@ public:
     void setImageBackingStore(CoordinatedImageBackingStore*);
     void setContentsBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&&);
     void setContentsSolidColor(const Color&);
-    void setFilters(const FilterOperations&);
 
     const TransformationMatrix& toSurfaceTransform() const { return m_transforms.combined; }
     FloatRect effectiveLayerRect() const { return FloatRect({ }, m_size); }
 
-    void computeTransforms(RefPtr<SkiaCompositingLayer> = nullptr);
-    void paint(SkCanvas&);
+    bool paint(SkCanvas&);
 
 private:
     SkiaCompositingLayer() = default;
@@ -95,6 +96,8 @@ private:
     bool isLeafOf3DRenderingContext() const { return !m_preserves3D && (m_parent && m_parent->m_preserves3D); }
     bool isReplica() const { return !!m_replicatedLayer; }
     bool hasVisualContent() const;
+
+    bool computeTransformsAndAnimations(RefPtr<SkiaCompositingLayer>, MonotonicTime);
 
     struct PaintContext {
         float opacity { 1 };
@@ -113,6 +116,18 @@ private:
 
     enum class IncludesReplica : bool { No, Yes };
     void computeOverlapRegions(ComputeOverlapRegionData&, const TransformationMatrix& accumulatedReplicaTransform = { }, IncludesReplica = IncludesReplica::Yes);
+
+    struct AnimationsState {
+        std::optional<TransformationMatrix> transform;
+        std::optional<float> opacity;
+        sk_sp<SkImageFilter> filter;
+        bool isRunning { false };
+    };
+    std::optional<AnimationsState> syncAnimations(MonotonicTime);
+
+    const TransformationMatrix& localTransform() const;
+    float opacity() const;
+    sk_sp<SkImageFilter> filter() const;
 
     Vector<Ref<SkiaCompositingLayer>> m_children;
     WeakPtr<SkiaCompositingLayer> m_parent;
@@ -140,8 +155,9 @@ private:
     std::unique_ptr<CoordinatedPlatformLayerBuffer> m_contentsBuffer;
     Color m_contentsSolidColor;
     sk_sp<SkImageFilter> m_filter;
+    TextureMapperAnimations m_animations;
+    std::optional<AnimationsState> m_animationsState;
     struct {
-        TransformationMatrix local;
         TransformationMatrix combined;
         TransformationMatrix combinedForChildren;
     } m_transforms;
