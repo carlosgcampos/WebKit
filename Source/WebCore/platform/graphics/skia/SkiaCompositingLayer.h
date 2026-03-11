@@ -109,6 +109,7 @@ private:
 
     struct PaintContext {
         float opacity { 1 };
+        bool isMask { false };
         TransformationMatrix accumulatedReplicaTransform;
     };
 
