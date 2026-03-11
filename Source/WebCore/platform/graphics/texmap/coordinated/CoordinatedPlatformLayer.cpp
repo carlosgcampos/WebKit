@@ -1210,8 +1210,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::ContentsTiling)) {
-            layer.setContentsTileSize(m_contentsTileSize);
-            layer.setContentsTilePhase(m_contentsTilePhase);
+            layer.setContentsTiling(m_contentsTileSize, m_contentsTilePhase);
             m_pendingChanges.remove(Change::ContentsTiling);
         }
 

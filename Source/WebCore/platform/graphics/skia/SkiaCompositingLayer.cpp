@@ -337,35 +337,33 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
                 canvas.clipRect(SkRect(m_contentsClippingRect.rect()));
         }
 
-        if (!m_contentsTileSize.isEmpty()) {
-            canvas.save();
-            canvas.clipRect(SkRect(m_contentsRect));
-
-            float startX = m_contentsRect.x() + m_contentsTilePhase.width();
-            float startY = m_contentsRect.y() + m_contentsTilePhase.height();
-
-            // Adjust start position to cover the contentsRect from the beginning.
-            while (startX > m_contentsRect.x())
-                startX -= m_contentsTileSize.width();
-            while (startY > m_contentsRect.y())
-                startY -= m_contentsTileSize.height();
-
-            for (float y = startY; y < m_contentsRect.maxY(); y += m_contentsTileSize.height()) {
-                for (float x = startX; x < m_contentsRect.maxX(); x += m_contentsTileSize.width()) {
-                    FloatRect tileRect(x, y, m_contentsTileSize.width(), m_contentsTileSize.height());
-                    if (m_contentsBuffer)
-                        m_contentsBuffer->paintToCanvas(canvas, tileRect, paint);
-                    else if (auto* buffer = m_imageBackingStore->buffer())
-                        buffer->paintToCanvas(canvas, tileRect, paint);
-                }
-            }
-
-            canvas.restore();
-        } else {
-            if (m_contentsBuffer)
-                m_contentsBuffer->paintToCanvas(canvas, m_contentsRect, paint);
-            else if (auto* buffer = m_imageBackingStore->buffer())
+        if (m_contentsBuffer)
+            m_contentsBuffer->paintToCanvas(canvas, m_contentsRect, paint);
+        else if (auto* buffer = m_imageBackingStore->buffer()) {
+            if (m_contentsTiling.size.isEmpty())
                 buffer->paintToCanvas(canvas, m_contentsRect, paint);
+            else {
+                canvas.save();
+                canvas.clipRect(SkRect(m_contentsRect));
+
+                float startX = m_contentsRect.x() + m_contentsTiling.phase.width();
+                float startY = m_contentsRect.y() + m_contentsTiling.phase.height();
+
+                // Adjust start position to cover the contentsRect from the beginning.
+                while (startX > m_contentsRect.x())
+                    startX -= m_contentsTiling.size.width();
+                while (startY > m_contentsRect.y())
+                    startY -= m_contentsTiling.size.height();
+
+                for (float y = startY; y < m_contentsRect.maxY(); y += m_contentsTiling.size.height()) {
+                    for (float x = startX; x < m_contentsRect.maxX(); x += m_contentsTiling.size.width()) {
+                        FloatRect tileRect(x, y, m_contentsTiling.size.width(), m_contentsTiling.size.height());
+                        buffer->paintToCanvas(canvas, tileRect, paint);
+                    }
+                }
+
+                canvas.restore();
+            }
         }
 
         if (shouldClipContents)
