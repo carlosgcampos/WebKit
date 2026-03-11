@@ -318,8 +318,6 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
     paint.setAlphaf(context.opacity);
-    if (context.isMask)
-        paint.setBlendMode(SkBlendMode::kDstIn);
 
     if (m_backingStore)
         m_backingStore->paintToCanvas(canvas, paint);
@@ -487,67 +485,59 @@ TransformationMatrix SkiaCompositingLayer::replicaTransform() const
         .multiply(m_transforms.combined.inverse().value_or(TransformationMatrix()));
 }
 
-void SkiaCompositingLayer::paintSelfAndChildrenWithReplica(SkCanvas& canvas, PaintContext& context)
+void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, PaintContext& context, const RefPtr<SkiaCompositingLayer>& mask, const sk_sp<SkImageFilter>& filter, Function<void()>&& paintContents)
 {
-    if (m_replica) {
-        canvas.save();
-        canvas.concat(SkM44(replicaTransform()));
-        paintSelfAndChildren(canvas, context);
+    // Mask and filter.
+    if (mask) {
+        // Paint mask first into an isolation layer, then composite the
+        // filtered content using SrcIn so the mask alpha clips the entire
+        // filter output (e.g. drop-shadow extends beyond mask bounds).
+        canvas.saveLayer(nullptr, nullptr);
+        mask->paintSelf(canvas, context);
+
+        SkPaint paint;
+        paint.setBlendMode(SkBlendMode::kSrcIn);
+        paint.setImageFilter(filter);
+        canvas.saveLayer(nullptr, &paint);
+
+        paintContents();
+
         canvas.restore();
+        canvas.restore();
+        return;
     }
 
-    paintSelfAndChildren(canvas, context);
+    // Filter only.
+    if (filter) {
+        SkPaint paint;
+        paint.setImageFilter(filter);
+        canvas.saveLayer(nullptr, &paint);
+
+        paintContents();
+
+        canvas.restore();
+        return;
+    }
+
+    paintContents();
 }
 
 void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas& canvas, PaintContext& context)
 {
-    bool hasMask = !!m_mask;
-    bool hasReplicaMask = m_replica && m_replica->m_mask;
     auto filter = this->filter();
 
-    if (hasMask || hasReplicaMask || filter) {
-        // Paint replica with its own mask (if any).
-        if (m_replica) {
-            if (hasReplicaMask || filter) {
-                SkPaint paint;
-                paint.setStyle(SkPaint::kFill_Style);
-                paint.setImageFilter(filter);
-                canvas.saveLayer(nullptr, &paint);
-            }
-
+    if (m_replica) {
+        paintWithOptionalFilterAndMask(canvas, context, m_replica->m_mask, filter, [&] {
             canvas.save();
             canvas.concat(SkM44(replicaTransform()));
             paintSelfAndChildren(canvas, context);
             canvas.restore();
+        });
+    }
 
-            if (hasReplicaMask) {
-                SetForScope scopedMask(context.isMask, true);
-                m_replica->m_mask->paintSelf(canvas, context);
-            }
-
-            if (hasReplicaMask || filter)
-                canvas.restore();
-        }
-
-        // Paint original with its own mask.
-        if (hasMask || filter) {
-            SkPaint paint;
-            paint.setStyle(SkPaint::kFill_Style);
-            paint.setImageFilter(filter);
-            canvas.saveLayer(nullptr, &paint);
-        }
-
+    paintWithOptionalFilterAndMask(canvas, context, m_mask, filter, [&] {
         paintSelfAndChildren(canvas, context);
-
-        if (hasMask) {
-            SetForScope scopedMask(context.isMask, true);
-            m_mask->paintSelf(canvas, context);
-        }
-
-        if (hasMask || filter)
-            canvas.restore();
-    } else
-        paintSelfAndChildrenWithReplica(canvas, context);
+    });
 }
 
 void SkiaCompositingLayer::recursivePaint(SkCanvas& canvas, PaintContext& context)
