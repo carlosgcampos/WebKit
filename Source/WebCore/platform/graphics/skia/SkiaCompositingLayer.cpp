@@ -530,11 +530,13 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas
         auto newAccumulatedReplicaTransform = TransformationMatrix(context.accumulatedReplicaTransform).multiply(replicaTransform());
         SetForScope scopedReplicaTransform(context.accumulatedReplicaTransform, newAccumulatedReplicaTransform);
 
-        paintWithOptionalFilterAndMask(canvas, context, m_replica->m_mask, filter, [&] {
-            canvas.save();
-            canvas.concat(SkM44(replicaTransform()));
-            paintSelfAndChildren(canvas, context);
-            canvas.restore();
+        paintWithOptionalFilterAndMask(canvas, context, m_mask, {}, [&] {
+            paintWithOptionalFilterAndMask(canvas, context, m_replica->m_mask, filter, [&] {
+                canvas.save();
+                canvas.concat(SkM44(replicaTransform()));
+                paintSelfAndChildren(canvas, context);
+                canvas.restore();
+            });
         });
     }
 
