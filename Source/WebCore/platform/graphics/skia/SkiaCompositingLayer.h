@@ -109,16 +109,15 @@ private:
 
     struct PaintContext {
         float opacity { 1 };
-        bool isMask { false };
     };
 
     void recursivePaint(SkCanvas&, PaintContext&);
     void paintSelf(SkCanvas&, PaintContext&);
     void paintSelfAndChildren(SkCanvas&, PaintContext&);
-    void paintSelfAndChildrenWithReplica(SkCanvas&, PaintContext&);
     void paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas&, PaintContext&);
     void paintUsingOverlapRegions(SkCanvas&, PaintContext&);
     void paintUsing3DRenderingContext(SkCanvas&, PaintContext&);
+    void paintWithOptionalFilterAndMask(SkCanvas&, PaintContext&, const RefPtr<SkiaCompositingLayer>& mask, const sk_sp<SkImageFilter>&, Function<void()>&&);
     TransformationMatrix replicaTransform() const;
     void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
 
