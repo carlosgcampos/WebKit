@@ -318,6 +318,8 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
     paint.setAlphaf(context.opacity);
+    if (context.isMask)
+        paint.setBlendMode(SkBlendMode::kDstIn);
 
     if (m_backingStore)
         m_backingStore->paintToCanvas(canvas, paint);
@@ -487,11 +489,17 @@ TransformationMatrix SkiaCompositingLayer::replicaTransform() const
 
 void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, PaintContext& context, const RefPtr<SkiaCompositingLayer>& mask, const sk_sp<SkImageFilter>& filter, Function<void()>&& paintContents)
 {
-    // Mask and filter.
+    // Clip to mask bounds to limit saveLayer buffer sizes.
     if (mask) {
-        // Paint mask first into an isolation layer, then composite the
-        // filtered content using SrcIn so the mask alpha clips the entire
-        // filter output (e.g. drop-shadow extends beyond mask bounds).
+        canvas.save();
+        canvas.concat(SkM44(mask->m_transforms.combined));
+        canvas.clipRect(SkRect::MakeWH(mask->m_size.width(), mask->m_size.height()));
+        canvas.concat(SkM44(mask->m_transforms.combined.inverse().value_or(TransformationMatrix())));
+    }
+
+    // Mask and filter: two saveLayer calls -- isolation for the mask,
+    // then SrcIn to clip filtered output by the mask alpha.
+    if (mask && filter) {
         canvas.saveLayer(nullptr, nullptr);
         mask->paintSelf(canvas, context);
 
@@ -501,6 +509,23 @@ void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, Pain
         canvas.saveLayer(nullptr, &paint);
 
         paintContents();
+
+        canvas.restore();
+        canvas.restore();
+        canvas.restore();
+        return;
+    }
+
+    // Mask only: single saveLayer with DstIn. The clip above ensures
+    // content outside the mask bounds is discarded (DstIn alone would
+    // leave those pixels untouched).
+    if (mask) {
+        canvas.saveLayer(nullptr, nullptr);
+
+        paintContents();
+
+        SetForScope scopedMask(context.isMask, true);
+        mask->paintSelf(canvas, context);
 
         canvas.restore();
         canvas.restore();
