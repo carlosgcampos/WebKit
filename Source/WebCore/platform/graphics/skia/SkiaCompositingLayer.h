@@ -109,6 +109,7 @@ private:
 
     struct PaintContext {
         float opacity { 1 };
+        TransformationMatrix accumulatedReplicaTransform;
     };
 
     void recursivePaint(SkCanvas&, PaintContext&);
@@ -122,7 +123,7 @@ private:
     void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
 
     enum class IncludesReplica : bool { No, Yes };
-    void computeOverlapRegions(ComputeOverlapRegionData&, const TransformationMatrix& accumulatedReplicaTransform = { }, IncludesReplica = IncludesReplica::Yes);
+    void computeOverlapRegions(ComputeOverlapRegionData&, const TransformationMatrix& accumulatedReplicaTransform, IncludesReplica = IncludesReplica::Yes);
 
     struct AnimationsState {
         std::optional<TransformationMatrix> transform;

@@ -527,6 +527,9 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas
     auto filter = this->filter();
 
     if (m_replica) {
+        auto newAccumulatedReplicaTransform = TransformationMatrix(context.accumulatedReplicaTransform).multiply(replicaTransform());
+        SetForScope scopedReplicaTransform(context.accumulatedReplicaTransform, newAccumulatedReplicaTransform);
+
         paintWithOptionalFilterAndMask(canvas, context, m_replica->m_mask, filter, [&] {
             canvas.save();
             canvas.concat(SkM44(replicaTransform()));
@@ -604,7 +607,7 @@ void SkiaCompositingLayer::paintUsingOverlapRegions(SkCanvas& canvas, PaintConte
         .overlapRegion = { },
         .nonOverlapRegion = { }
     };
-    computeOverlapRegions(data);
+    computeOverlapRegions(data, context.accumulatedReplicaTransform);
 
     SkiaCompositingLayerOverlapRegions::paint(canvas, context.opacity, data,
         [&](float effectiveOpacity) {
