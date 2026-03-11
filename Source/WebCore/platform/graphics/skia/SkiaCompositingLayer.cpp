@@ -206,6 +206,16 @@ void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
     m_filter = createFilters(filterOperations);
 }
 
+void SkiaCompositingLayer::setDebugIndicators(Color&& debugBorderColor, std::optional<float> debugBorderWidth, std::optional<unsigned> repaintCount)
+{
+    if (debugBorderColor.isValid())
+        m_debugBorder = { WTF::move(debugBorderColor), debugBorderWidth.value_or(1) };
+    else
+        m_debugBorder = std::nullopt;
+
+    m_repaintCount = repaintCount;
+}
+
 const TransformationMatrix& SkiaCompositingLayer::localTransform() const
 {
     if (!m_animationsState || !m_animationsState->isRunning)
@@ -370,11 +380,11 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
             canvas.restore();
     }
 
-    if (m_showDebugBorder) {
+    if (m_debugBorder) {
         SkPaint borderPaint;
         borderPaint.setStyle(SkPaint::kStroke_Style);
-        borderPaint.setColor(SkColor(m_debugBorderColor));
-        borderPaint.setStrokeWidth(m_debugBorderWidth);
+        borderPaint.setColor(SkColor(m_debugBorder->color));
+        borderPaint.setStrokeWidth(m_debugBorder->width);
         borderPaint.setAntiAlias(true);
 
         if (m_backingStore)
@@ -385,7 +395,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 
     // Capture the full canvas-to-device position while the layer transform is still active.
     SkPoint deviceOrigin { 0, 0 };
-    if (m_showRepaintCounter) {
+    if (m_repaintCount) {
         auto mapped = canvas.getLocalToDevice().map(0, 0, 0, 1);
         if (std::abs(mapped.w) > std::numeric_limits<float>::epsilon())
             deviceOrigin = { mapped.x / mapped.w, mapped.y / mapped.w };
@@ -395,10 +405,10 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 
     canvas.restore();
 
-    if (m_showRepaintCounter) {
+    if (m_repaintCount) {
         constexpr float pointSize = 14;
         constexpr float padding = 3;
-        auto counterString = String::number(m_repaintCount).ascii();
+        auto counterString = String::number(*m_repaintCount).ascii();
 
         static SkFont font = [] {
             auto typeface = FontCache::forCurrentThread().fontManager().matchFamilyStyle("monospace", SkFontStyle::Bold());
@@ -417,7 +427,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
         canvas.resetMatrix();
 
         SkPaint backgroundPaint;
-        backgroundPaint.setColor(SkColor(m_debugBorderColor));
+        backgroundPaint.setColor(m_debugBorder ? SkColor(m_debugBorder->color) : SK_ColorBLACK);
         backgroundPaint.setStyle(SkPaint::kFill_Style);
         canvas.drawRect(SkRect::MakeXYWH(deviceOrigin.x(), deviceOrigin.y(), textWidth, textHeight), backgroundPaint);
 

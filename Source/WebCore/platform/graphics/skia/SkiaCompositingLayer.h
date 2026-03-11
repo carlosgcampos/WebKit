@@ -84,11 +84,7 @@ public:
     void setContentsBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&&);
     void setContentsSolidColor(const Color&);
 
-    void setShowDebugBorder(bool showDebugBorder) { m_showDebugBorder = showDebugBorder; }
-    void setDebugBorderColor(Color debugBorderColor) { m_debugBorderColor = debugBorderColor; }
-    void setDebugBorderWidth(float debugBorderWidth) { m_debugBorderWidth = debugBorderWidth; }
-    void setShowRepaintCounter(bool showRepaintCounter) { m_showRepaintCounter = showRepaintCounter; }
-    void setRepaintCount(int repaintCount) { m_repaintCount = repaintCount; }
+    void setDebugIndicators(Color&& debugBorderColor, std::optional<float> debugBorderWidth, std::optional<unsigned> repaintCount);
 
     const TransformationMatrix& toSurfaceTransform() const { return m_transforms.combined; }
     FloatRect effectiveLayerRect() const { return FloatRect({ }, m_size); }
@@ -137,6 +133,11 @@ private:
     float opacity() const;
     sk_sp<SkImageFilter> filter() const;
 
+    struct DebugBorder {
+        Color color;
+        float width { 0 };
+    };
+
     Vector<Ref<SkiaCompositingLayer>> m_children;
     WeakPtr<SkiaCompositingLayer> m_parent;
     FloatSize m_size;
@@ -166,11 +167,8 @@ private:
     RefPtr<CoordinatedImageBackingStore> m_imageBackingStore;
     std::unique_ptr<CoordinatedPlatformLayerBuffer> m_contentsBuffer;
     Color m_contentsSolidColor;
-    Color m_debugBorderColor;
-    float m_debugBorderWidth { 0 };
-    int m_repaintCount { 0 };
-    bool m_showDebugBorder : 1 { false };
-    bool m_showRepaintCounter : 1 { false };
+    std::optional<DebugBorder> m_debugBorder;
+    std::optional<unsigned> m_repaintCount;
     sk_sp<SkImageFilter> m_filter;
     TextureMapperAnimations m_animations;
     std::optional<AnimationsState> m_animationsState;
