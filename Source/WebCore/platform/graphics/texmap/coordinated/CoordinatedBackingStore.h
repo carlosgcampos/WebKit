@@ -57,6 +57,7 @@ public:
 
 #if USE(SKIA)
     void paintToCanvas(SkCanvas&, const SkPaint&);
+    void drawDebugBorders(SkCanvas&, const SkPaint&);
 #endif
 
 private:
