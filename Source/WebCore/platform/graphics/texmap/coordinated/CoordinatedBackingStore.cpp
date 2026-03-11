@@ -161,6 +161,12 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
         canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &tilePaint, SkCanvas::kFast_SrcRectConstraint);
     }
 }
+
+void CoordinatedBackingStore::drawDebugBorders(SkCanvas& canvas, const SkPaint& paint)
+{
+    for (const auto& tile : m_tiles.values())
+        canvas.drawRect(SkRect(tile.rect()), paint);
+}
 #endif
 
 } // namespace WebCore

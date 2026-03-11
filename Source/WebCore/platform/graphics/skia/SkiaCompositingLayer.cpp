@@ -388,7 +388,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
         borderPaint.setAntiAlias(true);
 
         if (m_backingStore)
-            canvas.drawRect(SkRect(effectiveLayerRect()), borderPaint);
+            m_backingStore->drawDebugBorders(canvas, borderPaint);
         if (m_contentsBuffer || m_imageBackingStore || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()))
             canvas.drawRect(SkRect(m_contentsRect), borderPaint);
     }
