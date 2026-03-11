@@ -235,9 +235,16 @@ void SkiaCompositingLayerOverlapRegions::paint(SkCanvas& canvas, float opacity, 
         nonOverlapRegion = Region();
     }
 
+    // Overlap regions are computed in device coordinates. Apply clips in device
+    // space by temporarily resetting the matrix, then restore it for painting.
+    // This matches TextureMapperLayer which clips with an identity transform.
+    auto ctm = canvas.getLocalToDevice();
+
     for (const auto& rect : nonOverlapRegion.rects()) {
         canvas.save();
+        canvas.resetMatrix();
         canvas.clipIRect(SkIRect::MakeLTRB(rect.x(), rect.y(), rect.maxX(), rect.maxY()));
+        canvas.setMatrix(ctm);
         paintContent(opacity);
         canvas.restore();
     }
@@ -252,9 +259,13 @@ void SkiaCompositingLayerOverlapRegions::paint(SkCanvas& canvas, float opacity, 
     SkPaint layerPaint;
     layerPaint.setAlphaf(opacity);
     for (const auto& rect : overlapRects) {
+        canvas.save();
+        canvas.resetMatrix();
         auto skRect = SkRect::MakeLTRB(rect.x(), rect.y(), rect.maxX(), rect.maxY());
         canvas.saveLayer(&skRect, &layerPaint);
+        canvas.setMatrix(ctm);
         paintContent(1.0);
+        canvas.restore();
         canvas.restore();
     }
 }
