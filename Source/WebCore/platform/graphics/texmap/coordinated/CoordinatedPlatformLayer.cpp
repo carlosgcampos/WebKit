@@ -1258,11 +1258,17 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::DebugIndicators)) {
-            layer.setShowRepaintCounter(m_repaintCount != -1);
-            layer.setRepaintCount(m_repaintCount);
-            layer.setShowDebugBorder(m_debugBorderColor.isVisible());
-            layer.setDebugBorderColor(m_debugBorderColor);
-            layer.setDebugBorderWidth(m_debugBorderWidth);
+            Color color;
+            std::optional<float> width;
+            if (m_debugBorderColor.isVisible()) {
+                color = m_debugBorderColor;
+                width = m_debugBorderWidth;
+            }
+            std::optional<unsigned> repaintCount;
+            if (m_repaintCount != -1)
+                repaintCount = m_repaintCount;
+
+            layer.setDebugIndicators(WTF::move(color), width, repaintCount);
             m_pendingChanges.remove(Change::DebugIndicators);
         }
 
