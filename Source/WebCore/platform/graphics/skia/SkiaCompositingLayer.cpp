@@ -206,6 +206,30 @@ void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
     m_filter = createFilters(filterOperations);
 }
 
+void SkiaCompositingLayer::setBackdropFilters(const FilterOperations& filterOperations)
+{
+    m_backdrop.filter = createFilters(filterOperations);
+}
+
+void SkiaCompositingLayer::setBackdropFiltersRect(const FloatRoundedRect& clipRect)
+{
+    m_backdrop.clipRect = clipRect;
+}
+
+Ref<SkiaCompositingLayer> SkiaCompositingLayer::backdropRoot()
+{
+    if (m_isBackdropRoot)
+        return *this;
+
+    if (m_parent)
+        return m_parent->backdropRoot();
+
+    if (m_replicatedLayer)
+        m_replicatedLayer->backdropRoot();
+
+    return *this;
+}
+
 void SkiaCompositingLayer::setDebugIndicators(Color&& debugBorderColor, std::optional<float> debugBorderWidth, std::optional<unsigned> repaintCount)
 {
     if (debugBorderColor.isValid())
@@ -442,6 +466,26 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 
 void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& context)
 {
+    if (m_backdrop.filter && context.paintingBackdropForLayer == this)
+        return;
+
+    if (m_backdrop.filter && !context.paintingBackdropForLayer) {
+        canvas.save();
+        SkPathBuilder builder;
+        builder.addRRect(SkRRect(m_backdrop.clipRect));
+        canvas.clipPath(builder.detach().makeTransform(SkM44(m_transforms.combined).asM33()), true);
+
+        SkPaint paint;
+        paint.setImageFilter(m_backdrop.filter);
+        canvas.saveLayer(nullptr, &paint);
+
+        SetForScope scopedPaintBackdropFortLayer(context.paintingBackdropForLayer, this);
+        backdropRoot()->recursivePaint(canvas, context);
+
+        canvas.restore();
+        canvas.restore();
+    }
+
     paintSelf(canvas, context);
 
     if (m_children.isEmpty())

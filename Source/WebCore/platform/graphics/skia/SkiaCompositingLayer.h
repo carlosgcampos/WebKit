@@ -76,6 +76,9 @@ public:
     void setMask(RefPtr<SkiaCompositingLayer>&&);
     void setReplica(RefPtr<SkiaCompositingLayer>&&);
     void setFilters(const FilterOperations&);
+    void setBackdropFilters(const FilterOperations&);
+    void setBackdropFiltersRect(const FloatRoundedRect&);
+    void setIsBackdropRoot(bool isBackdropRoot) { m_isBackdropRoot = isBackdropRoot; }
     void setChildren(Vector<Ref<SkiaCompositingLayer>>&&);
 
     void setUseBackingStore(bool, CoordinatedAnimatedBackingStoreClient* = nullptr);
@@ -99,6 +102,7 @@ private:
     bool isLeafOf3DRenderingContext() const { return !m_preserves3D && (m_parent && m_parent->m_preserves3D); }
     bool isReplica() const { return !!m_replicatedLayer; }
     bool hasVisualContent() const;
+    Ref<SkiaCompositingLayer> backdropRoot();
 
     bool computeTransformsAndAnimations(RefPtr<SkiaCompositingLayer>, MonotonicTime);
 
@@ -106,6 +110,7 @@ private:
         float opacity { 1 };
         bool isMask { false };
         TransformationMatrix accumulatedReplicaTransform;
+        RefPtr<SkiaCompositingLayer> paintingBackdropForLayer;
     };
 
     void recursivePaint(SkCanvas&, PaintContext&);
@@ -171,6 +176,11 @@ private:
     std::optional<DebugBorder> m_debugBorder;
     std::optional<unsigned> m_repaintCount;
     sk_sp<SkImageFilter> m_filter;
+    struct {
+        sk_sp<SkImageFilter> filter;
+        FloatRoundedRect clipRect;
+    } m_backdrop;
+    bool m_isBackdropRoot { false };
     TextureMapperAnimations m_animations;
     std::optional<AnimationsState> m_animationsState;
     struct {

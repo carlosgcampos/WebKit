@@ -654,6 +654,17 @@ void CoordinatedPlatformLayer::setBackdropRect(const FloatRoundedRect& backdropR
     notifyCompositionRequired();
 }
 
+void CoordinatedPlatformLayer::setIsBackdropRoot(bool isBackdropRoot)
+{
+    ASSERT(m_lock.isHeld());
+    if (m_isBackdropRoot == isBackdropRoot)
+        return;
+
+    m_isBackdropRoot = isBackdropRoot;
+    m_pendingChanges.add(Change::BackdropRoot);
+    notifyCompositionRequired();
+}
+
 void CoordinatedPlatformLayer::setAnimations(const TextureMapperAnimations& animations)
 {
     ASSERT(m_lock.isHeld());
@@ -1243,13 +1254,19 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
         }
 
         if (m_pendingChanges.contains(Change::Backdrop)) {
-            notImplemented();
+            // FIXME: stop creating a layer for backdrop filters when switching to SkiaCompositingLayer.
+            layer.setBackdropFilters(m_backdrop ? m_backdrop->m_filters : FilterOperations());
             m_pendingChanges.remove(Change::Backdrop);
         }
 
         if (m_pendingChanges.contains(Change::BackdropRect)) {
-            notImplemented();
+            layer.setBackdropFiltersRect(m_backdropRect);
             m_pendingChanges.remove(Change::BackdropRect);
+        }
+
+        if (m_pendingChanges.contains(Change::BackdropRoot)) {
+            layer.setIsBackdropRoot(m_isBackdropRoot);
+            m_pendingChanges.remove(Change::BackdropRoot);
         }
 
         if (m_pendingChanges.contains(Change::Animations)) {

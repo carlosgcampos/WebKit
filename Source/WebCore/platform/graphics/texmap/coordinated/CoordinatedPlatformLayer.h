@@ -167,6 +167,7 @@ public:
     void setReplica(CoordinatedPlatformLayer*);
     void setBackdrop(CoordinatedPlatformLayer*);
     void setBackdropRect(const FloatRoundedRect&);
+    void setIsBackdropRoot(bool);
 
     void setAnimations(const TextureMapperAnimations&);
 
@@ -216,41 +217,42 @@ private:
     void flushCompositingStateOnSkiaTarget(const OptionSet<CompositionReason>&, SkiaCompositingLayer&);
 #endif
 
-    enum class Change : uint32_t {
-        Position                     = 1 << 0,
-        BoundsOrigin                 = 1 << 1,
-        AnchorPoint                  = 1 << 2,
-        Size                         = 1 << 3,
-        Transform                    = 1 << 4,
-        ChildrenTransform            = 1 << 5,
-        DrawsContent                 = 1 << 6,
-        MasksToBounds                = 1 << 7,
-        Preserves3D                  = 1 << 8,
-        BackfaceVisibility           = 1 << 9,
-        Opacity                      = 1 << 10,
-        Children                     = 1 << 11,
-        BackingStore                 = 1 << 12,
-        ContentsVisible              = 1 << 13,
-        ContentsOpaque               = 1 << 14,
-        ContentsRect                 = 1 << 15,
-        ContentsRectClipsDescendants = 1 << 16,
-        ContentsClippingRect         = 1 << 17,
-        ContentsTiling               = 1 << 18,
-        ContentsBuffer               = 1 << 19,
-        ContentsImage                = 1 << 20,
-        ContentsColor                = 1 << 21,
-        Filters                      = 1 << 22,
-        Mask                         = 1 << 23,
-        Replica                      = 1 << 24,
-        Backdrop                     = 1 << 25,
-        BackdropRect                 = 1 << 26,
-        Animations                   = 1 << 27,
-        DebugIndicators              = 1 << 28,
+    enum class Change : uint64_t {
+        Position                     = 1LLU << 0,
+        BoundsOrigin                 = 1LLU << 1,
+        AnchorPoint                  = 1LLU << 2,
+        Size                         = 1LLU << 3,
+        Transform                    = 1LLU << 4,
+        ChildrenTransform            = 1LLU << 5,
+        DrawsContent                 = 1LLU << 6,
+        MasksToBounds                = 1LLU << 7,
+        Preserves3D                  = 1LLU << 8,
+        BackfaceVisibility           = 1LLU << 9,
+        Opacity                      = 1LLU << 10,
+        Children                     = 1LLU << 11,
+        BackingStore                 = 1LLU << 12,
+        ContentsVisible              = 1LLU << 13,
+        ContentsOpaque               = 1LLU << 14,
+        ContentsRect                 = 1LLU << 15,
+        ContentsRectClipsDescendants = 1LLU << 16,
+        ContentsClippingRect         = 1LLU << 17,
+        ContentsTiling               = 1LLU << 18,
+        ContentsBuffer               = 1LLU << 19,
+        ContentsImage                = 1LLU << 20,
+        ContentsColor                = 1LLU << 21,
+        Filters                      = 1LLU << 22,
+        Mask                         = 1LLU << 23,
+        Replica                      = 1LLU << 24,
+        Backdrop                     = 1LLU << 25,
+        BackdropRect                 = 1LLU << 26,
+        BackdropRoot                 = 1LLU << 27,
+        Animations                   = 1LLU << 28,
+        DebugIndicators              = 1LLU << 29,
 #if ENABLE(DAMAGE_TRACKING)
-        Damage                       = 1 << 29,
+        Damage                       = 1LLU << 30,
 #endif
 #if ENABLE(SCROLLING_THREAD)
-        ScrollingNode                = 1 << 30
+        ScrollingNode                = 1LLU << 31
 #endif
     };
 
@@ -314,6 +316,7 @@ private:
     RefPtr<CoordinatedPlatformLayer> m_replica WTF_GUARDED_BY_LOCK(m_lock);
     RefPtr<CoordinatedPlatformLayer> m_backdrop WTF_GUARDED_BY_LOCK(m_lock);
     FloatRoundedRect m_backdropRect WTF_GUARDED_BY_LOCK(m_lock);
+    bool m_isBackdropRoot WTF_GUARDED_BY_LOCK(m_lock) { false };
     TextureMapperAnimations m_animations WTF_GUARDED_BY_LOCK(m_lock);
     Vector<Ref<CoordinatedPlatformLayer>> m_children WTF_GUARDED_BY_LOCK(m_lock);
     EventRegion m_eventRegion WTF_GUARDED_BY_LOCK(m_lock);
