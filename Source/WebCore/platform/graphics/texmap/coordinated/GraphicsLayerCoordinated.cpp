@@ -589,6 +589,15 @@ void GraphicsLayerCoordinated::setBackdropFiltersRect(const FloatRoundedRect& ba
     noteLayerPropertyChanged(Change::BackdropRect, ScheduleFlush::Yes);
 }
 
+void GraphicsLayerCoordinated::setIsBackdropRoot(bool isBackdropRoot)
+{
+    if (m_isBackdropRoot == isBackdropRoot)
+        return;
+
+    GraphicsLayer::setIsBackdropRoot(isBackdropRoot);
+    noteLayerPropertyChanged(Change::BackdropRoot, ScheduleFlush::Yes);
+}
+
 bool GraphicsLayerCoordinated::addAnimation(const GraphicsLayerKeyframeValueList& valueList, const GraphicsLayerAnimation* animation, const String& animationName, double timeOffset)
 {
     ASSERT(!animationName.isEmpty());
@@ -1098,6 +1107,9 @@ void GraphicsLayerCoordinated::commitLayerChanges(CommitState& commitState, floa
 
     if (m_pendingChanges.contains(Change::BackdropRect))
         updateBackdropFiltersRect();
+
+    if (m_pendingChanges.contains(Change::BackdropRoot))
+        m_platformLayer->setIsBackdropRoot(m_isBackdropRoot);
 
     if (m_pendingChanges.contains(Change::Animations))
         updateAnimations();
