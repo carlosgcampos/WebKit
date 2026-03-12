@@ -96,7 +96,14 @@ void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const Fl
         const auto matrix = swapRedBlueMatrix();
         imagePaint.setColorFilter(SkColorFilters::Matrix(matrix.data().data()));
     }
+    if (m_flags.contains(TextureMapperFlags::ShouldFlipTexture)) {
+        canvas.save();
+        canvas.translate(0, targetRect.height());
+        canvas.scale(1, -1);
+    }
     canvas.drawImageRect(image, SkRect::MakeWH(m_size.width(), m_size.height()), targetRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &imagePaint, SkCanvas::kFast_SrcRectConstraint);
+    if (m_flags.contains(TextureMapperFlags::ShouldFlipTexture))
+        canvas.restore();
 }
 #endif
 
