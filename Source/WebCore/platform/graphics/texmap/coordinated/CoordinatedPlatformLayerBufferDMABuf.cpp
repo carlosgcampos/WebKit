@@ -284,6 +284,24 @@ void CoordinatedPlatformLayerBufferDMABuf::paintToTextureMapper(TextureMapper& t
         buffer->paintToTextureMapper(textureMapper, targetRect, modelViewMatrix, opacity);
 }
 
+#if USE(SKIA)
+void CoordinatedPlatformLayerBufferDMABuf::paintToCanvas(SkCanvas& canvas, const FloatRect& targetRect, const SkPaint& paint)
+{
+    waitForContentsIfNeeded();
+
+    if (m_fenceFD) {
+        if (auto fence = GLFence::importFD(PlatformDisplay::sharedDisplay().glDisplay(), WTF::move(m_fenceFD)))
+            fence->serverWait();
+    }
+
+    if (!m_dmabuf->buffer())
+        m_dmabuf->setBuffer(importDMABuf());
+
+    if (auto* buffer = m_dmabuf->buffer())
+        buffer->paintToCanvas(canvas, targetRect, paint);
+}
+#endif
+
 } // namespace WebCore
 
 #endif // USE(COORDINATED_GRAPHICS) && USE(GBM)
