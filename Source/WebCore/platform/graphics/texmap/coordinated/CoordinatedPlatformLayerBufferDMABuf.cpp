@@ -193,6 +193,29 @@ static const HashMap<uint32_t, Vector<YUVPlaneInfo>>& yuvFormatPlaneInfo()
     return yuvFormatsMap;
 }
 
+static CoordinatedPlatformLayerBufferYUV::Format yuvFormatFromDRMFourcc(uint32_t fourcc)
+{
+    switch (fourcc) {
+    case DRM_FORMAT_AYUV:
+        return CoordinatedPlatformLayerBufferYUV::Format::AYUV;
+    case DRM_FORMAT_NV12:
+        return CoordinatedPlatformLayerBufferYUV::Format::NV12;
+    case DRM_FORMAT_P010:
+        return CoordinatedPlatformLayerBufferYUV::Format::P010;
+    case DRM_FORMAT_YUV420:
+        return CoordinatedPlatformLayerBufferYUV::Format::YUV420;
+    case DRM_FORMAT_YVU420:
+        return CoordinatedPlatformLayerBufferYUV::Format::YVU420;
+    case DRM_FORMAT_YUV444:
+        return CoordinatedPlatformLayerBufferYUV::Format::YUV444;
+    case DRM_FORMAT_YUV411:
+        return CoordinatedPlatformLayerBufferYUV::Format::YUV411;
+    case DRM_FORMAT_YUV422:
+        return CoordinatedPlatformLayerBufferYUV::Format::YUV422;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
 std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDMABuf::importYUV() const
 {
     OptionSet<BitmapTexture::Flags> textureFlags;
@@ -222,6 +245,8 @@ std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDM
     if (textures.isEmpty())
         return nullptr;
 
+    auto format = yuvFormatFromDRMFourcc(attributes.fourcc);
+
     CoordinatedPlatformLayerBufferYUV::YuvToRgbColorSpace yuvToRgbColorSpace;
     switch (m_dmabuf->colorSpace().value_or(DMABufBuffer::ColorSpace::Bt601)) {
     case DMABufBuffer::ColorSpace::Bt601:
@@ -249,7 +274,7 @@ std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDM
     }
 
     unsigned numberOfPlanes = textures.size();
-    return CoordinatedPlatformLayerBufferYUV::create(numberOfPlanes, WTF::move(textures), WTF::move(yuvPlane), WTF::move(yuvPlaneOffset), yuvToRgbColorSpace, transferFunction, m_size, m_flags, nullptr);
+    return CoordinatedPlatformLayerBufferYUV::create(format, numberOfPlanes, WTF::move(textures), WTF::move(yuvPlane), WTF::move(yuvPlaneOffset), yuvToRgbColorSpace, transferFunction, m_size, m_flags, nullptr);
 }
 
 std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDMABuf::importDMABuf() const
