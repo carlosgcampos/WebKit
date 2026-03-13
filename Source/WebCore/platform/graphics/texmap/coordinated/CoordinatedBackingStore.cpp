@@ -140,6 +140,9 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
     sk_sp<SkColorFilter> bgraFilter;
     auto tilePaint = paint;
     for (const auto& tile : m_tiles.values()) {
+        if (canvas.quickReject(tile.rect()))
+            continue;
+
         auto& texture = tile.texture();
 
         GrGLTextureInfo externalTexture;
