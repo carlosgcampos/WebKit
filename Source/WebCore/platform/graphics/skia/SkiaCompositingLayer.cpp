@@ -497,62 +497,97 @@ TransformationMatrix SkiaCompositingLayer::replicaTransform() const
 
 void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, PaintContext& context, const RefPtr<SkiaCompositingLayer>& mask, const sk_sp<SkImageFilter>& filter, Function<void()>&& paintContents)
 {
-    // Clip to mask bounds to limit saveLayer buffer sizes.
-    if (mask) {
+    if (!mask && !filter) {
+        paintContents();
+        return;
+    }
+
+    // Restrict saveLayer buffer sizes to the consolidated overlap region rects,
+    // matching TextureMapperLayer::paintSelfChildrenFilterAndMask behavior.
+    auto mode = mask ? ComputeOverlapRegionMode::Mask : ComputeOverlapRegionMode::Union;
+    auto overlapRects = computeConsolidatedOverlapRegionRects(canvas, context, mode);
+    auto ctm = canvas.getLocalToDevice();
+
+    SkM44 maskInverseTransform;
+    if (mask)
+        maskInverseTransform = SkM44(mask->m_transforms.combined.inverse().value_or(TransformationMatrix()));
+
+    for (const auto& rect : overlapRects) {
         canvas.save();
-        canvas.concat(SkM44(mask->m_transforms.combined));
-        canvas.clipRect(SkRect::MakeWH(mask->m_size.width(), mask->m_size.height()));
-        canvas.concat(SkM44(mask->m_transforms.combined.inverse().value_or(TransformationMatrix())));
+        canvas.resetMatrix();
+        canvas.clipIRect(SkIRect(rect));
+        canvas.setMatrix(ctm);
+
+        // Clip to mask bounds to limit saveLayer buffer sizes.
+        if (mask) {
+            canvas.save();
+            canvas.concat(SkM44(mask->m_transforms.combined));
+            canvas.clipRect(SkRect::MakeWH(mask->m_size.width(), mask->m_size.height()));
+            canvas.concat(maskInverseTransform);
+        }
+
+        // Mask and filter: two saveLayer calls -- isolation for the mask,
+        // then SrcIn to clip filtered output by the mask alpha.
+        if (mask && filter) {
+            canvas.saveLayer(nullptr, nullptr);
+            mask->paintSelf(canvas, context);
+
+            SkPaint paint;
+            paint.setBlendMode(SkBlendMode::kSrcIn);
+            paint.setImageFilter(filter);
+            canvas.saveLayer(nullptr, &paint);
+
+            paintContents();
+
+            canvas.restore();
+            canvas.restore();
+            canvas.restore();
+        } else if (mask) {
+            // Mask only: single saveLayer with DstIn. The clip above ensures
+            // content outside the mask bounds is discarded (DstIn alone would
+            // leave those pixels untouched).
+            canvas.saveLayer(nullptr, nullptr);
+
+            paintContents();
+
+            SetForScope scopedMask(context.isMask, true);
+            mask->paintSelf(canvas, context);
+
+            canvas.restore();
+            canvas.restore();
+        } else {
+            // Filter only.
+            SkPaint paint;
+            paint.setImageFilter(filter);
+            canvas.saveLayer(nullptr, &paint);
+
+            paintContents();
+
+            canvas.restore();
+        }
+
+        canvas.restore();
+    }
+}
+
+Vector<IntRect, 1> SkiaCompositingLayer::computeConsolidatedOverlapRegionRects(const SkCanvas& canvas, const PaintContext& context, ComputeOverlapRegionMode mode)
+{
+    ComputeOverlapRegionData data {
+        .mode = mode,
+        .clipBounds = canvas.getDeviceClipBounds(),
+        .overlapRegion = { },
+        .nonOverlapRegion = { }
+    };
+    computeOverlapRegions(data, context.accumulatedReplicaTransform, IncludesReplica::No);
+
+    auto rects = data.overlapRegion.rects();
+    static constexpr size_t cOverlapRegionConsolidationThreshold = 4;
+    if (rects.size() > cOverlapRegionConsolidationThreshold) {
+        rects.clear();
+        rects.append(data.overlapRegion.bounds());
     }
 
-    // Mask and filter: two saveLayer calls -- isolation for the mask,
-    // then SrcIn to clip filtered output by the mask alpha.
-    if (mask && filter) {
-        canvas.saveLayer(nullptr, nullptr);
-        mask->paintSelf(canvas, context);
-
-        SkPaint paint;
-        paint.setBlendMode(SkBlendMode::kSrcIn);
-        paint.setImageFilter(filter);
-        canvas.saveLayer(nullptr, &paint);
-
-        paintContents();
-
-        canvas.restore();
-        canvas.restore();
-        canvas.restore();
-        return;
-    }
-
-    // Mask only: single saveLayer with DstIn. The clip above ensures
-    // content outside the mask bounds is discarded (DstIn alone would
-    // leave those pixels untouched).
-    if (mask) {
-        canvas.saveLayer(nullptr, nullptr);
-
-        paintContents();
-
-        SetForScope scopedMask(context.isMask, true);
-        mask->paintSelf(canvas, context);
-
-        canvas.restore();
-        canvas.restore();
-        return;
-    }
-
-    // Filter only.
-    if (filter) {
-        SkPaint paint;
-        paint.setImageFilter(filter);
-        canvas.saveLayer(nullptr, &paint);
-
-        paintContents();
-
-        canvas.restore();
-        return;
-    }
-
-    paintContents();
+    return rects;
 }
 
 void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas& canvas, PaintContext& context)
