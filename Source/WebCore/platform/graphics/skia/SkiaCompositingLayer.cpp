@@ -225,7 +225,7 @@ Ref<SkiaCompositingLayer> SkiaCompositingLayer::backdropRoot()
         return m_parent->backdropRoot();
 
     if (m_replicatedLayer)
-        m_replicatedLayer->backdropRoot();
+        return m_replicatedLayer->backdropRoot();
 
     return *this;
 }
@@ -479,7 +479,7 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
         paint.setImageFilter(m_backdrop.filter);
         canvas.saveLayer(nullptr, &paint);
 
-        SetForScope scopedPaintBackdropFortLayer(context.paintingBackdropForLayer, this);
+        SetForScope scopedPaintBackdropForLayer(context.paintingBackdropForLayer, this);
         backdropRoot()->recursivePaint(canvas, context);
 
         canvas.restore();
