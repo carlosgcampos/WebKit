@@ -1253,10 +1253,12 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
             m_pendingChanges.remove(Change::Replica);
         }
 
-        if (m_pendingChanges.contains(Change::Backdrop)) {
+        if (m_pendingChanges.contains(Change::Backdrop) || (m_backdrop && m_backdrop->m_pendingChanges.contains(Change::Filters))) {
             // FIXME: stop creating a layer for backdrop filters when switching to SkiaCompositingLayer.
             layer.setBackdropFilters(m_backdrop ? m_backdrop->m_filters : FilterOperations());
             m_pendingChanges.remove(Change::Backdrop);
+            if (m_backdrop)
+                m_backdrop->m_pendingChanges.remove(Change::Filters);
         }
 
         if (m_pendingChanges.contains(Change::BackdropRect)) {
