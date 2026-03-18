@@ -26,6 +26,7 @@
 #pragma once
 
 #if USE(SKIA)
+#include "BoxExtents.h"
 #include "Color.h"
 #include "CoordinatedBackingStoreProxy.h"
 #include "FloatPoint.h"
@@ -113,13 +114,18 @@ private:
         RefPtr<SkiaCompositingLayer> paintingBackdropForLayer;
     };
 
+    struct Filter {
+        sk_sp<SkImageFilter> filter;
+        IntOutsets outsets;
+    };
+
     void recursivePaint(SkCanvas&, PaintContext&);
     void paintSelf(SkCanvas&, PaintContext&);
     void paintSelfAndChildren(SkCanvas&, PaintContext&);
     void paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas&, PaintContext&);
     void paintUsingOverlapRegions(SkCanvas&, PaintContext&);
     void paintUsing3DRenderingContext(SkCanvas&, PaintContext&);
-    void paintWithOptionalFilterAndMask(SkCanvas&, PaintContext&, const RefPtr<SkiaCompositingLayer>& mask, const sk_sp<SkImageFilter>&, Function<void()>&&);
+    void paintWithOptionalFilterAndMask(SkCanvas&, PaintContext&, const RefPtr<SkiaCompositingLayer>& mask, const std::optional<Filter>&, Function<void()>&&);
     Vector<IntRect, 1> computeConsolidatedOverlapRegionRects(const SkCanvas&, const PaintContext&, ComputeOverlapRegionMode);
     TransformationMatrix replicaTransform() const;
     void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
@@ -130,14 +136,14 @@ private:
     struct AnimationsState {
         std::optional<TransformationMatrix> transform;
         std::optional<float> opacity;
-        sk_sp<SkImageFilter> filter;
+        std::optional<Filter> filter;
         bool isRunning { false };
     };
     std::optional<AnimationsState> syncAnimations(MonotonicTime);
 
     const TransformationMatrix& localTransform() const;
     float opacity() const;
-    sk_sp<SkImageFilter> filter() const;
+    const std::optional<Filter> filter() const;
 
     struct DebugBorder {
         Color color;
@@ -175,7 +181,7 @@ private:
     Color m_contentsSolidColor;
     std::optional<DebugBorder> m_debugBorder;
     std::optional<unsigned> m_repaintCount;
-    sk_sp<SkImageFilter> m_filter;
+    std::optional<Filter> m_filter;
     struct {
         sk_sp<SkImageFilter> filter;
         FloatRoundedRect clipRect;
