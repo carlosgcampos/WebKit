@@ -203,7 +203,7 @@ static sk_sp<SkImageFilter> createFilters(const FilterOperations& filterOperatio
 
 void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
 {
-    m_filter = createFilters(filterOperations);
+    m_filter = { createFilters(filterOperations), filterOperations.outsets() };
 }
 
 void SkiaCompositingLayer::setBackdropFilters(const FilterOperations& filterOperations)
@@ -256,7 +256,7 @@ float SkiaCompositingLayer::opacity() const
     return m_animationsState->opacity.value_or(m_opacity);
 }
 
-sk_sp<SkImageFilter> SkiaCompositingLayer::filter() const
+const std::optional<SkiaCompositingLayer::Filter> SkiaCompositingLayer::filter() const
 {
     if (!m_animationsState || !m_animationsState->isRunning)
         return m_filter;
@@ -276,7 +276,7 @@ std::optional<SkiaCompositingLayer::AnimationsState> SkiaCompositingLayer::syncA
     state.transform = applicationResults.transform;
     state.opacity = applicationResults.opacity;
     if (applicationResults.filters)
-        state.filter = createFilters(*applicationResults.filters);
+        state.filter = { createFilters(*applicationResults.filters), applicationResults.filters->outsets() };
     state.isRunning = applicationResults.hasRunningAnimations;
     return state;
 }
@@ -539,7 +539,7 @@ TransformationMatrix SkiaCompositingLayer::replicaTransform() const
         .multiply(m_transforms.combined.inverse().value_or(TransformationMatrix()));
 }
 
-void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, PaintContext& context, const RefPtr<SkiaCompositingLayer>& mask, const sk_sp<SkImageFilter>& filter, Function<void()>&& paintContents)
+void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, PaintContext& context, const RefPtr<SkiaCompositingLayer>& mask, const std::optional<Filter>& filter, Function<void()>&& paintContents)
 {
     if (!mask && !filter) {
         paintContents();
@@ -578,7 +578,7 @@ void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, Pain
 
             SkPaint paint;
             paint.setBlendMode(SkBlendMode::kSrcIn);
-            paint.setImageFilter(filter);
+            paint.setImageFilter(filter->filter);
             canvas.saveLayer(nullptr, &paint);
 
             paintContents();
@@ -602,7 +602,7 @@ void SkiaCompositingLayer::paintWithOptionalFilterAndMask(SkCanvas& canvas, Pain
         } else {
             // Filter only.
             SkPaint paint;
-            paint.setImageFilter(filter);
+            paint.setImageFilter(filter->filter);
             canvas.saveLayer(nullptr, &paint);
 
             paintContents();
@@ -642,7 +642,7 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas
         auto newAccumulatedReplicaTransform = TransformationMatrix(context.accumulatedReplicaTransform).multiply(replicaTransform());
         SetForScope scopedReplicaTransform(context.accumulatedReplicaTransform, newAccumulatedReplicaTransform);
 
-        paintWithOptionalFilterAndMask(canvas, context, m_mask, {}, [&] {
+        paintWithOptionalFilterAndMask(canvas, context, m_mask, std::nullopt, [&] {
             paintWithOptionalFilterAndMask(canvas, context, m_replica->m_mask, filter, [&] {
                 canvas.save();
                 canvas.concat(SkM44(replicaTransform()));
@@ -680,11 +680,18 @@ void SkiaCompositingLayer::computeOverlapRegions(ComputeOverlapRegionData& data,
     if (!m_visible || !m_contentsVisible)
         return;
 
+    auto filter = this->filter();
+
     FloatRect localBoundingRect;
-    if (m_backingStore || m_masksToBounds || m_mask)
+    if (m_backingStore || m_masksToBounds || m_mask || filter || m_backdrop.filter)
         localBoundingRect = effectiveLayerRect();
     else if (m_contentsBuffer || m_imageBackingStore || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()))
         localBoundingRect = m_contentsRect;
+
+    if (filter && !filter->outsets.isZero() && !m_masksToBounds && !m_mask && !m_backdrop.filter) {
+        localBoundingRect.move(-filter->outsets.left(), -filter->outsets.top());
+        localBoundingRect.expand(filter->outsets.left() + filter->outsets.right(), filter->outsets.top() + filter->outsets.bottom());
+    }
 
     TransformationMatrix transform(accumulatedReplicaTransform);
     transform.multiply(m_transforms.combined);
