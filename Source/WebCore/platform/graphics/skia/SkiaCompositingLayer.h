@@ -118,14 +118,16 @@ private:
         sk_sp<SkImageFilter> filter;
         IntOutsets outsets;
     };
+    using PaintFunction = Function<void(SkCanvas&, PaintContext&)>;
 
     void recursivePaint(SkCanvas&, PaintContext&);
     void paintSelf(SkCanvas&, PaintContext&);
     void paintSelfAndChildren(SkCanvas&, PaintContext&);
     void paintSelfAndChildrenWithReplicaFilterAndMask(SkCanvas&, PaintContext&);
+    void paintSelfAndChildrenWithFilterAndMask(SkCanvas&, PaintContext&);
+    void paintWithIntermediateSurface(SkCanvas&, PaintContext&, const IntRect&, SkPaint*, PaintFunction&&);
     void paintUsingOverlapRegions(SkCanvas&, PaintContext&);
     void paintUsing3DRenderingContext(SkCanvas&, PaintContext&);
-    void paintWithOptionalFilterAndMask(SkCanvas&, PaintContext&, const RefPtr<SkiaCompositingLayer>& mask, const std::optional<Filter>&, Function<void()>&&);
     Vector<IntRect, 1> computeConsolidatedOverlapRegionRects(const SkCanvas&, const PaintContext&, ComputeOverlapRegionMode);
     TransformationMatrix replicaTransform() const;
     void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
