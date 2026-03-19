@@ -110,6 +110,7 @@ private:
     struct PaintContext {
         float opacity { 1 };
         bool isMask { false };
+        sk_sp<SkColorFilter> colorFilter;
         TransformationMatrix accumulatedReplicaTransform;
         RefPtr<SkiaCompositingLayer> paintingBackdropForLayer;
     };

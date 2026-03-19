@@ -209,7 +209,10 @@ static sk_sp<SkImageFilter> createFilters(const FilterOperations& filterOperatio
 
 void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
 {
-    m_filter = { createFilters(filterOperations), filterOperations.outsets() };
+    if (filterOperations.isEmpty())
+        m_filter = std::nullopt;
+    else
+        m_filter = { createFilters(filterOperations), filterOperations.outsets() };
 }
 
 void SkiaCompositingLayer::setBackdropFilters(const FilterOperations& filterOperations)
@@ -363,6 +366,8 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
     paint.setAlphaf(context.opacity);
     if (context.isMask)
         paint.setBlendMode(SkBlendMode::kDstIn);
+    if (context.colorFilter)
+        paint.setColorFilter(context.colorFilter);
 
     if (m_backingStore)
         m_backingStore->paintToCanvas(canvas, paint);
@@ -590,6 +595,18 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
     if (!filter && !m_mask) {
         paintSelfAndChildren(canvas, context);
         return;
+    }
+
+    if (filter && !m_mask) {
+        SkColorFilter* colorFilterPtr = nullptr;
+        if (filter->filter->asAColorFilter(&colorFilterPtr)) {
+            // If we have a filter (and no mask) that can be simplified as a color filter
+            // we don't need to create an intermediate surface.
+            sk_sp<SkColorFilter> colorFilter(colorFilterPtr);
+            SetForScope scopedColorFilter(context.colorFilter, colorFilter);
+            paintSelfAndChildren(canvas, context);
+            return;
+        }
     }
 
     // Restrict intermediate surface size to the consolidated overlap region rects,

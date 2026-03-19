@@ -158,9 +158,11 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
                 const auto matrix = swapRedBlueMatrix();
                 bgraFilter = SkColorFilters::Matrix(matrix.data().data());
             }
-            tilePaint.setColorFilter(bgraFilter);
-        } else
-            tilePaint.setColorFilter(nullptr);
+            if (auto* colorFilter = paint.getColorFilter())
+                tilePaint.setColorFilter(colorFilter->makeComposed(bgraFilter));
+            else
+                tilePaint.setColorFilter(bgraFilter);
+        }
         canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &tilePaint, SkCanvas::kFast_SrcRectConstraint);
     }
 }

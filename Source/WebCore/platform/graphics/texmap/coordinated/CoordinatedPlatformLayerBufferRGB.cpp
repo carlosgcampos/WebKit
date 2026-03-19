@@ -94,7 +94,11 @@ void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const Fl
     auto imagePaint = paint;
     if (m_texture && m_texture->colorConvertFlags().contains(TextureMapperFlags::ShouldConvertTextureBGRAToRGBA)) {
         const auto matrix = swapRedBlueMatrix();
-        imagePaint.setColorFilter(SkColorFilters::Matrix(matrix.data().data()));
+        auto bgraFilter = SkColorFilters::Matrix(matrix.data().data());
+        if (auto* colorFilter = paint.getColorFilter())
+            imagePaint.setColorFilter(colorFilter->makeComposed(bgraFilter));
+        else
+            imagePaint.setColorFilter(bgraFilter);
     }
     if (m_flags.contains(TextureMapperFlags::ShouldFlipTexture)) {
         canvas.save();
