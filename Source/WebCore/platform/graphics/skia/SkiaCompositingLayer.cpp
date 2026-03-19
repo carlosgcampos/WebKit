@@ -486,7 +486,7 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
         clipTransform.multiply(m_transforms.combined);
         canvas.clipPath(builder.detach().makeTransform(SkM44(clipTransform).asM33()), true);
 
-        // Paint the backdrop root's subtree into a fresh saveLayer (spec step 1),
+        // Paint the backdrop root's subtree into a fresh surface (spec step 1),
         // apply the backdrop filter (step 2), and composite via SrcOver so the
         // filtered result blends onto the canvas without destroying ancestor
         // backgrounds that aren't part of the backdrop root's subtree.
@@ -495,14 +495,13 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
         // exclude the root's own effects (replica, filter, mask) per the CSS spec.
         SkPaint paint;
         paint.setImageFilter(m_backdrop.filter);
-        canvas.saveLayer(nullptr, &paint);
+        paintWithIntermediateSurface(canvas, context, enclosingIntRect(clipTransform.mapRect(m_backdrop.clipRect.rect())), &paint, [&](SkCanvas& canvas, PaintContext& context) {
+            SetForScope scopedPaintBackdropForLayer(context.paintingBackdropForLayer, this);
+            SetForScope scopedOpacity(context.opacity, 1.f);
+            SetForScope scopedReplicaTransform(context.accumulatedReplicaTransform, TransformationMatrix());
+            backdropRoot()->paintSelfAndChildren(canvas, context);
+        });
 
-        SetForScope scopedPaintBackdropForLayer(context.paintingBackdropForLayer, this);
-        SetForScope scopedOpacity(context.opacity, 1.f);
-        SetForScope scopedReplicaTransform(context.accumulatedReplicaTransform, TransformationMatrix());
-        backdropRoot()->paintSelfAndChildren(canvas, context);
-
-        canvas.restore();
         canvas.restore();
     }
 
