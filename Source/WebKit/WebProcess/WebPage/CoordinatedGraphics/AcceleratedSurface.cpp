@@ -512,6 +512,19 @@ AcceleratedSurface::RenderTargetSHMImage::~RenderTargetSHMImage()
 
 void AcceleratedSurface::RenderTargetSHMImage::didRenderFrame()
 {
+    if (m_skiaSurface) {
+        auto* glContext = PlatformDisplay::sharedDisplay().skiaGLContext();
+        ASSERT(glContext);
+        GLContext::ScopedGLContextCurrent currentContext(*glContext);
+        SkImageInfo info = SkImageInfo::Make(
+            m_bitmap->size().width(),
+            m_bitmap->size().height(),
+            SkColorType::kBGRA_8888_SkColorType,
+            SkAlphaType::kPremul_SkAlphaType
+        );
+        m_skiaSurface->readPixels(info, m_bitmap->mutableSpan().data(), m_bitmap->bytesPerRow(), 0, 0);
+        return;
+    }
     glReadPixels(0, 0, m_bitmap->size().width(), m_bitmap->size().height(), GL_BGRA, GL_UNSIGNED_BYTE, m_bitmap->mutableSpan().data());
 }
 
