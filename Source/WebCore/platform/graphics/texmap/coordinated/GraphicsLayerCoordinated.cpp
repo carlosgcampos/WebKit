@@ -961,10 +961,11 @@ void GraphicsLayerCoordinated::updateBackdropFilters()
         m_backdropLayer->setFilters(m_backdropFilters);
     }
 
-    if (isNewLayer)
+    if (isNewLayer) {
         updateBackdropFiltersRect();
-
-    m_platformLayer->setBackdrop(m_backdropLayer.get());
+        m_platformLayer->setBackdrop(m_backdropLayer.get());
+    } else
+        m_platformLayer->notifyBackdropFiltersChanged();
 }
 
 void GraphicsLayerCoordinated::updateBackdropFiltersRect()
