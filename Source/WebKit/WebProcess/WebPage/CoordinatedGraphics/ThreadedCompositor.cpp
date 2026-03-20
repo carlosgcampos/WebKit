@@ -373,6 +373,12 @@ void ThreadedCompositor::paintToSkiaCanvas(const TransformationMatrix& matrix, c
         display.skiaGLContext()->makeContextCurrent();
 
     canvas->save();
+
+    if (m_flipY) {
+        canvas->translate(0, size.height());
+        canvas->scale(1, -1);
+    }
+
     bool sceneHasRunningAnimations = rootLayer.paint(*canvas);
     canvas->restore();
 
