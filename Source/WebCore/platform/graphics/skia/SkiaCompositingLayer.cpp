@@ -449,7 +449,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
         auto counterString = String::number(*m_repaintCount).ascii();
 
         static SkFont font = [] {
-            auto typeface = FontCache::forCurrentThread()->fontManager().matchFamilyStyle("monospace", SkFontStyle::Bold());
+            auto typeface = FontCache::forCurrentThread().fontManager().matchFamilyStyle("monospace", SkFontStyle::Bold());
             SkFont f(typeface, pointSize);
             f.setEdging(SkFont::Edging::kAntiAlias);
             f.setSubpixel(true);
