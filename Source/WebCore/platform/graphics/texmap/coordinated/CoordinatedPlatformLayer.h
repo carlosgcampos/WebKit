@@ -166,6 +166,7 @@ public:
     void setMask(CoordinatedPlatformLayer*);
     void setReplica(CoordinatedPlatformLayer*);
     void setBackdrop(CoordinatedPlatformLayer*);
+    void notifyBackdropFiltersChanged();
     void setBackdropRect(const FloatRoundedRect&);
     void setIsBackdropRoot(bool);
 

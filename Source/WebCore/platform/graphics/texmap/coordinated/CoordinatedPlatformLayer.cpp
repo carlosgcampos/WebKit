@@ -639,6 +639,12 @@ void CoordinatedPlatformLayer::setBackdrop(CoordinatedPlatformLayer* backdrop)
         return;
 
     m_backdrop = backdrop;
+    notifyBackdropFiltersChanged();
+}
+
+void CoordinatedPlatformLayer::notifyBackdropFiltersChanged()
+{
+    ASSERT(m_lock.isHeld());
     m_pendingChanges.add(Change::Backdrop);
     notifyCompositionRequired();
 }
