@@ -268,6 +268,7 @@ void CoordinatedPlatformLayerBufferYUV::paintToCanvas(SkCanvas& canvas, const Fl
         case TransferFunction::Pq:
             return SkColorSpace::MakeRGB(SkNamedTransferFn::kPQ, SkNamedGamut::kRec2020);
         }
+        RELEASE_ASSERT_NOT_REACHED();
     }();
 
     auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
