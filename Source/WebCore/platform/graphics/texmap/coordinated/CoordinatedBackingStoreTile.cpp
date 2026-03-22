@@ -28,7 +28,14 @@
 #include <wtf/SystemTracing.h>
 
 #if USE(SKIA)
+#include "BitmapTexture.h"
+#include "PlatformDisplay.h"
 #include "SkiaPaintingEngine.h"
+WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+#include <skia/gpu/ganesh/GrBackendSurface.h>
+#include <skia/gpu/ganesh/SkImageGanesh.h>
+#include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
+WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #endif
 
 namespace WebCore {
@@ -51,6 +58,11 @@ void CoordinatedBackingStoreTile::processPendingUpdates()
     auto updatesCount = updates.size();
     if (!updatesCount)
         return;
+
+#if USE(SKIA)
+    // The underlying GL texture is about to be updated; the cached SkImage wrapping it is now stale.
+    m_cachedSkImage = nullptr;
+#endif
 
     WTFBeginSignpost(this, CoordinatedSwapBuffers, "%zu updates", updatesCount);
     for (unsigned updateIndex = 0; updateIndex < updatesCount; ++updateIndex) {
@@ -114,6 +126,23 @@ void CoordinatedBackingStoreTile::processPendingUpdates()
     }
     WTFEndSignpost(this, CoordinatedSwapBuffers);
 }
+
+#if USE(SKIA)
+const sk_sp<SkImage>& CoordinatedBackingStoreTile::ensureSkImage()
+{
+    if (!m_cachedSkImage && m_texture) {
+        auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
+        GrGLTextureInfo externalTexture;
+        externalTexture.fTarget = GL_TEXTURE_2D;
+        externalTexture.fID = m_texture->id();
+        externalTexture.fFormat = GL_RGBA8;
+        const auto& size = m_texture->size();
+        auto backendTexture = GrBackendTextures::MakeGL(size.width(), size.height(), skgpu::Mipmapped::kNo, externalTexture);
+        m_cachedSkImage = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+    }
+    return m_cachedSkImage;
+}
+#endif
 
 } // namespace WebCore
 
