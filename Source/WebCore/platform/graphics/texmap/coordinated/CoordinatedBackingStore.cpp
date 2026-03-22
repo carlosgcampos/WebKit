@@ -25,7 +25,6 @@
 #include "ColorMatrix.h"
 #include "CoordinatedTileBuffer.h"
 #include "GraphicsLayer.h"
-#include "PlatformDisplay.h"
 #include "TextureMapper.h"
 #include "TextureMapperFlags.h"
 #include <wtf/SystemTracing.h>
@@ -33,10 +32,6 @@
 #if USE(SKIA)
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkColorFilter.h>
-#include <skia/core/SkImage.h>
-#include <skia/gpu/ganesh/GrBackendSurface.h>
-#include <skia/gpu/ganesh/SkImageGanesh.h>
-#include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #endif
 
@@ -135,25 +130,17 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
     if (m_tiles.isEmpty())
         return;
 
-    auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
-
     sk_sp<SkColorFilter> bgraFilter;
     auto tilePaint = paint;
-    for (const auto& tile : m_tiles.values()) {
+    for (auto& tile : m_tiles.values()) {
         if (canvas.quickReject(tile.rect()))
             continue;
 
-        auto& texture = tile.texture();
+        const auto& image = tile.ensureSkImage();
+        if (!image)
+            continue;
 
-        GrGLTextureInfo externalTexture;
-        externalTexture.fTarget = GL_TEXTURE_2D;
-        externalTexture.fID = texture.id();
-        externalTexture.fFormat = GL_RGBA8;
-        const auto& size = texture.size();
-        auto backendTexture = GrBackendTextures::MakeGL(size.width(), size.height(), skgpu::Mipmapped::kNo, externalTexture);
-        sk_sp<SkImage> image = SkImages::BorrowTextureFrom(grContext, backendTexture, kTopLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
-
-        if (texture.colorConvertFlags().contains(TextureMapperFlags::ShouldConvertTextureBGRAToRGBA)) {
+        if (tile.texture().colorConvertFlags().contains(TextureMapperFlags::ShouldConvertTextureBGRAToRGBA)) {
             if (!bgraFilter) {
                 const auto matrix = swapRedBlueMatrix();
                 bgraFilter = SkColorFilters::Matrix(matrix.data().data());
@@ -163,7 +150,7 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
             else
                 tilePaint.setColorFilter(bgraFilter);
         }
-        canvas.drawImageRect(image, SkRect::MakeWH(size.width(), size.height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &tilePaint, SkCanvas::kFast_SrcRectConstraint);
+        canvas.drawImageRect(image, SkRect::MakeWH(image->width(), image->height()), tile.rect(), SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &tilePaint, SkCanvas::kFast_SrcRectConstraint);
     }
 }
 
