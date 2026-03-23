@@ -377,8 +377,8 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
         canvas.drawRect(m_contentsRect, paint);
     } else if (m_contentsBuffer || m_imageBackingStore) {
         bool shouldClipContents = m_contentsClippingRect.isRounded() || !m_contentsClippingRect.rect().contains(m_contentsRect);
+        SkAutoCanvasRestore autoRestore(&canvas, shouldClipContents);
         if (shouldClipContents) {
-            canvas.save();
             if (m_contentsClippingRect.isRounded())
                 canvas.clipRRect(SkRRect(m_contentsClippingRect), true);
             else
@@ -391,7 +391,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
             if (m_contentsTiling.size.isEmpty())
                 buffer->paintToCanvas(canvas, m_contentsRect, paint);
             else {
-                canvas.save();
+                SkAutoCanvasRestore autoRestore(&canvas, true);
                 canvas.clipRect(SkRect(m_contentsRect));
 
                 float startX = m_contentsRect.x() + m_contentsTiling.phase.width();
@@ -409,13 +409,8 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
                         buffer->paintToCanvas(canvas, tileRect, paint);
                     }
                 }
-
-                canvas.restore();
             }
         }
-
-        if (shouldClipContents)
-            canvas.restore();
     }
 
     if (m_debugBorder) {
@@ -461,7 +456,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
         float textWidth = textBounds.width() + padding * 2;
         float textHeight = textBounds.height() + padding * 2;
 
-        canvas.save();
+        SkAutoCanvasRestore autoRestore(&canvas, true);
         canvas.resetMatrix();
 
         SkPaint backgroundPaint;
@@ -473,8 +468,6 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
         textPaint.setColor(SK_ColorWHITE);
         textPaint.setAntiAlias(true);
         canvas.drawString(counterString.data(), deviceOrigin.x() + padding, deviceOrigin.y() - textBounds.fTop + padding, font, textPaint);
-
-        canvas.restore();
     }
 }
 
@@ -484,7 +477,7 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
         return;
 
     if (m_backdrop.filter && !context.paintingBackdropForLayer) {
-        canvas.save();
+        SkAutoCanvasRestore autoRestore(&canvas, true);
         SkPathBuilder builder;
         builder.addRRect(SkRRect(m_backdrop.clipRect));
         TransformationMatrix clipTransform(context.accumulatedReplicaTransform);
@@ -506,8 +499,6 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
             SetForScope scopedReplicaTransform(context.accumulatedReplicaTransform, TransformationMatrix());
             backdropRoot()->paintSelfAndChildren(canvas, context);
         });
-
-        canvas.restore();
     }
 
     paintSelf(canvas, context);
@@ -516,8 +507,8 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
         return;
 
     bool shouldClip = (m_masksToBounds || m_contentsRectClipsDescendants) && !m_preserves3D;
+    SkAutoCanvasRestore autoRestore(&canvas, shouldClip);
     if (shouldClip) {
-        canvas.save();
         if (m_contentsRectClipsDescendants) {
             SkPathBuilder builder;
             if (m_contentsClippingRect.isRounded())
@@ -536,9 +527,6 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
 
     for (auto& child : m_children)
         child->recursivePaint(canvas, context);
-
-    if (shouldClip)
-        canvas.restore();
 }
 
 bool SkiaCompositingLayer::isVisible() const
@@ -782,8 +770,8 @@ void SkiaCompositingLayer::paintUsing3DRenderingContext(SkCanvas& canvas, PaintC
     collect3DRenderingContextLayers(layers);
 
     SkiaCompositingLayer3DRenderingContext::paint(layers, [&](SkiaCompositingLayer& layer, std::optional<SkPath> clipPath) {
+        SkAutoCanvasRestore autoRestore(&canvas, clipPath.has_value());
         if (clipPath) {
-            canvas.save();
             canvas.clipPath(*clipPath);
         }
 
@@ -791,9 +779,6 @@ void SkiaCompositingLayer::paintUsing3DRenderingContext(SkCanvas& canvas, PaintC
             layer.paintSelf(canvas, context);
         else
             layer.recursivePaint(canvas, context);
-
-        if (clipPath)
-            canvas.restore();
     });
 }
 
