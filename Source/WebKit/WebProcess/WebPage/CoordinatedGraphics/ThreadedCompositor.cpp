@@ -33,6 +33,8 @@
 #include "RenderProcessInfo.h"
 #include "WebPage.h"
 #include "WebProcess.h"
+#include <WebCore/Page.h>
+#include <WebCore/Settings.h>
 #include <WebCore/CoordinatedPlatformLayer.h>
 #include <WebCore/Damage.h>
 #include <WebCore/PlatformDisplay.h>
@@ -59,10 +61,13 @@ using namespace WebCore;
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(ThreadedCompositor);
 
-static bool useSkia()
+static bool useSkia(WebPage& webPage)
 {
-    static const auto useSkiaForComposition = String::fromLatin1(getenv("WEBKIT_USE_SKIA_FOR_COMPOSITION"));
-    return !useSkiaForComposition.isEmpty() && useSkiaForComposition != "0"_s;
+    if (webPage.corePage()->settings().useSkiaForComposition())
+        return true;
+
+    static auto envValue = String::fromLatin1(getenv("WEBKIT_USE_SKIA_FOR_COMPOSITION"));
+    return !envValue.isEmpty() && envValue != "0"_s;
 }
 
 Ref<ThreadedCompositor> ThreadedCompositor::create(WebPage& webPage, LayerTreeHost& layerTreeHost, CoordinatedSceneState& sceneState)
@@ -73,7 +78,8 @@ Ref<ThreadedCompositor> ThreadedCompositor::create(WebPage& webPage, LayerTreeHo
 ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTreeHost, CoordinatedSceneState& sceneState)
     : m_workQueue(WorkQueue::create("org.webkit.ThreadedCompositor"_s))
     , m_layerTreeHost(&layerTreeHost)
-    , m_surface(AcceleratedSurface::create(webPage, [this] { frameComplete(); }, AcceleratedSurface::RenderingPurpose::Composited, useSkia()))
+    , m_useSkia(useSkia(webPage))
+    , m_surface(AcceleratedSurface::create(webPage, [this] { frameComplete(); }, AcceleratedSurface::RenderingPurpose::Composited, m_useSkia))
     , m_sceneState(&sceneState)
     , m_flipY(m_surface->shouldPaintMirrored())
     , m_renderTimer(m_workQueue->runLoop(), "ThreadedCompositor::RenderTimer"_s, this, &ThreadedCompositor::renderLayerTree)
@@ -100,7 +106,7 @@ ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTre
         // a plain C cast expression in this one instance works in all cases.
         static_assert(sizeof(GLNativeWindowType) <= sizeof(uint64_t), "GLNativeWindowType must not be longer than 64 bits.");
         auto nativeSurfaceHandle = (GLNativeWindowType)m_surface->window();
-        if (useSkia() && !nativeSurfaceHandle) {
+        if (m_useSkia && !nativeSurfaceHandle) {
             // When using Skia for composition, use the thread-local SkiaGLContext from sharedDisplay()
             // instead of creating a separate GLContext. This avoids expensive context switching between
             // the compositor's context and Skia's context during paintToSkiaCanvas().
@@ -117,7 +123,7 @@ ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTre
                 m_flipY = !m_flipY;
             glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 
-            if (!useSkia())
+            if (!m_useSkia)
                 m_textureMapper = TextureMapper::create();
         }
     });
@@ -276,10 +282,10 @@ void ThreadedCompositor::flushCompositingState(const OptionSet<CompositionReason
         ASSERT(!reasons.contains(CompositionReason::RenderingUpdate) || !m_state.isWaitingForTiles);
     }
 #endif
-    bool useSkiaTarget = !m_textureMapper;
-    m_sceneState->rootLayer().flushCompositingState(reasons, useSkiaTarget);
+
+    m_sceneState->rootLayer().flushCompositingState(reasons, m_useSkia);
     for (auto& layer : m_sceneState->committedLayers())
-        layer->flushCompositingState(reasons, useSkiaTarget);
+        layer->flushCompositingState(reasons, m_useSkia);
 }
 
 void ThreadedCompositor::paintToCurrentGLContext(const TransformationMatrix& matrix, const IntSize& size, const OptionSet<CompositionReason>& reasons)
