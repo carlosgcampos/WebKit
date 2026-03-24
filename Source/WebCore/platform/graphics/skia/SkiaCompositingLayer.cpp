@@ -41,7 +41,6 @@
 #include "SkiaCompositingLayer3DRenderingContext.h"
 #include "SkiaCompositingLayerOverlapRegions.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
-#include <skia/core/SkColorFilter.h>
 #include <skia/core/SkFont.h>
 #include <skia/core/SkPathBuilder.h>
 #include <skia/core/SkRRect.h>
@@ -51,12 +50,15 @@ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
 #include <skia/gpu/ganesh/gl/GrGLDirectContext.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+#include <wtf/Scope.h>
 #include <wtf/SetForScope.h>
 #include <wtf/TZoneMallocInlines.h>
 
 namespace WebCore {
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(SkiaCompositingLayer);
+
+static constexpr float s_opacityVisibilityThreshold = 0.01;
 
 Ref<SkiaCompositingLayer> SkiaCompositingLayer::create()
 {
@@ -70,6 +72,28 @@ void SkiaCompositingLayer::invalidate()
     for (auto& child : m_children)
         child->m_parent = nullptr;
     removeFromParent();
+}
+
+void SkiaCompositingLayer::setSize(const FloatSize& size)
+{
+#if ENABLE(DAMAGE_TRACKING)
+    if (frameDamagePropagationEnabled() && m_size != size) {
+        m_size = size;
+        damageWholeLayer();
+        addPreviousRectToSharedFrameDamage();
+        return;
+    }
+#endif
+    m_size = size;
+}
+
+void SkiaCompositingLayer::setOpacity(float opacity)
+{
+#if ENABLE(DAMAGE_TRACKING)
+    if (frameDamagePropagationEnabled() && m_opacity != opacity)
+        damageWholeLayer();
+#endif
+    m_opacity = opacity;
 }
 
 void SkiaCompositingLayer::setChildren(Vector<Ref<SkiaCompositingLayer>>&& newChildren)
@@ -98,6 +122,11 @@ void SkiaCompositingLayer::removeFromParent()
     parent->m_children.removeFirstMatching([this](auto& layer) {
         return layer.ptr() == this;
     });
+
+#if ENABLE(DAMAGE_TRACKING)
+    if (parent->frameDamagePropagationEnabled())
+        recursiveAddPreviousRectToSharedFrameDamage(Ref { *this });
+#endif
 }
 
 void SkiaCompositingLayer::setUseBackingStore(bool useBackingStore, CoordinatedAnimatedBackingStoreClient* animatedBackingStoreClient)
@@ -138,6 +167,10 @@ void SkiaCompositingLayer::setContentsBuffer(std::unique_ptr<CoordinatedPlatform
 
 void SkiaCompositingLayer::setContentsSolidColor(const Color& color)
 {
+#if ENABLE(DAMAGE_TRACKING)
+    if (frameDamagePropagationEnabled() && m_contentsSolidColor != color)
+        damageWholeLayer();
+#endif
     m_contentsSolidColor = color;
 }
 
@@ -246,6 +279,37 @@ Ref<SkiaCompositingLayer> SkiaCompositingLayer::backdropRoot()
     return *this;
 }
 
+#if ENABLE(DAMAGE_TRACKING)
+void SkiaCompositingLayer::addDamage(Damage&& damage)
+{
+    // The damage is added not to override the damage that could be inferred from other set* operations.
+    if (m_layerDamage)
+        m_layerDamage->add(damage);
+    else
+        m_layerDamage = WTF::move(damage);
+}
+
+void SkiaCompositingLayer::addPreviousRectToSharedFrameDamage()
+{
+    if (!m_previousLayerRectInFrameCoordinates)
+        return;
+
+    // In many cases, damaging the whole layer in the "new" state is not enough.
+    // When e.g. changing size, transform, etc. the layer (or its parts) effectively disappears from one place
+    // and re-appears in another. Therefore the damaging of a layer in the "old" state is required as well.
+    ASSERT(m_sharedFrameDamage);
+    m_sharedFrameDamage->add(*m_previousLayerRectInFrameCoordinates);
+}
+
+void SkiaCompositingLayer::recursiveAddPreviousRectToSharedFrameDamage(Ref<SkiaCompositingLayer> layer)
+{
+    layer->addPreviousRectToSharedFrameDamage();
+
+    for (auto& child : layer->m_children)
+        recursiveAddPreviousRectToSharedFrameDamage(child);
+}
+#endif
+
 void SkiaCompositingLayer::setDebugIndicators(Color&& debugBorderColor, std::optional<float> debugBorderWidth, std::optional<unsigned> repaintCount)
 {
     if (debugBorderColor.isValid())
@@ -291,6 +355,14 @@ std::optional<SkiaCompositingLayer::AnimationsState> SkiaCompositingLayer::syncA
     AnimationsState state;
     state.transform = applicationResults.transform;
     state.opacity = applicationResults.opacity;
+#if ENABLE(DAMAGE_TRACKING)
+    const bool currentOpacity = opacity();
+    const bool newOpacity = state.opacity.value_or(m_opacity);
+    if (frameDamagePropagationEnabled() && currentOpacity != newOpacity) {
+        damageWholeLayer();
+        // FIXME: add collectFrameDamageDespiteBeingInvisible?
+    }
+#endif
     if (applicationResults.filters)
         state.filter = { createFilters(*applicationResults.filters), applicationResults.filters->outsets() };
     state.isRunning = applicationResults.hasRunningAnimations;
@@ -306,6 +378,10 @@ bool SkiaCompositingLayer::computeTransformsAndAnimations(RefPtr<SkiaCompositing
         TransformationMatrix parentTransform;
         if (parent)
             parentTransform = parent == m_parent ? parent->m_transforms.combinedForChildren : parent->m_transforms.combined;
+
+#if ENABLE(DAMAGE_TRACKING)
+        TransformationMatrix previousTransform = m_transforms.combined;
+#endif
 
         FloatPoint origin(m_anchorPoint.x(), m_anchorPoint.y());
         origin.scale(m_size.width(), m_size.height());
@@ -324,6 +400,13 @@ bool SkiaCompositingLayer::computeTransformsAndAnimations(RefPtr<SkiaCompositing
             m_transforms.combinedForChildren.flatten();
         m_transforms.combinedForChildren.multiply(m_childrenTransform);
         m_transforms.combinedForChildren.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
+
+#if ENABLE(DAMAGE_TRACKING)
+        if (frameDamagePropagationEnabled() && previousTransform != m_transforms.combined) {
+            damageWholeLayer();
+            addPreviousRectToSharedFrameDamage();
+        }
+#endif
 
         m_visible = m_backfaceVisibility || !m_transforms.combined.isBackFaceVisible();
 
@@ -349,16 +432,31 @@ bool SkiaCompositingLayer::computeTransformsAndAnimations(RefPtr<SkiaCompositing
     return hasRunningAnimations;
 }
 
-bool SkiaCompositingLayer::paint(SkCanvas& canvas)
+bool SkiaCompositingLayer::paint(SkCanvas& canvas, std::optional<Damage>& damage)
 {
     bool hasRunningAnimations = computeTransformsAndAnimations(nullptr, MonotonicTime::now());
-    PaintContext context;
+    PaintContext context(damage);
     recursivePaint(canvas, context);
+
+#if ENABLE(DAMAGE_TRACKING)
+    if (damage && frameDamagePropagationEnabled()) {
+        damage->add(*m_sharedFrameDamage);
+        *m_sharedFrameDamage = Damage(m_size);
+    }
+#endif
+
     return hasRunningAnimations;
 }
 
 void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 {
+#if ENABLE(DAMAGE_TRACKING)
+    m_previousLayerRectInFrameCoordinates = std::nullopt;
+    auto cleanup = WTF::makeScopeExit([&] {
+        m_layerDamage = std::nullopt;
+    });
+#endif
+
     if (m_size.isEmpty() || !m_visible || !m_contentsVisible || !hasVisualContent())
         return;
 
@@ -419,6 +517,25 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
             }
         }
     }
+
+#if ENABLE(DAMAGE_TRACKING)
+    if (frameDamagePropagationEnabled() && context.frameDamage) {
+        m_previousLayerRectInFrameCoordinates = transform.mapRect(effectiveLayerRect());
+        auto clipBounds = FloatRect(SkRect::Make(canvas.getDeviceClipBounds()));
+        if (!clipBounds.isEmpty())
+            m_previousLayerRectInFrameCoordinates->intersect(clipBounds);
+
+        if (m_layerDamage) {
+            for (const auto& rect : *m_layerDamage) {
+                auto damageRect = transform.mapRect(FloatRect(rect));
+                if (!clipBounds.isEmpty())
+                    damageRect.intersect(clipBounds);
+                context.frameDamage->add(damageRect);
+            }
+        } else if ((m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible()) || m_contentsBuffer || m_imageBackingStore)
+            context.frameDamage->add(*m_previousLayerRectInFrameCoordinates);
+    }
+#endif
 
     if (m_debugBorder) {
         SkPaint borderPaint;
@@ -538,7 +655,6 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
 
 bool SkiaCompositingLayer::isVisible() const
 {
-    constexpr float cOpacityVisibilityThreshold = 0.01;
     if (m_size.isEmpty() && (m_masksToBounds || m_children.isEmpty()))
         return false;
     if (!m_visible && m_children.isEmpty())
@@ -547,7 +663,7 @@ bool SkiaCompositingLayer::isVisible() const
         return false;
     if (!hasVisualContent() && m_children.isEmpty())
         return false;
-    if (opacity() < cOpacityVisibilityThreshold)
+    if (opacity() < s_opacityVisibilityThreshold)
         return false;
     return true;
 }
@@ -609,11 +725,26 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
     auto mode = m_mask ? ComputeOverlapRegionMode::Mask : ComputeOverlapRegionMode::Union;
     auto overlapRects = computeConsolidatedOverlapRegionRects(canvas, context, mode);
 
+#if ENABLE(DAMAGE_TRACKING)
+    auto clipBounds = FloatRect(SkRect::Make(canvas.getDeviceClipBounds()));
+    TransformationMatrix transform(context.accumulatedReplicaTransform);
+    transform.multiply(m_transforms.combined);
+#endif
+
     SkPaint paint;
     if (filter)
         paint.setImageFilter(filter->filter);
 
     for (const auto& rect : overlapRects) {
+#if ENABLE(DAMAGE_TRACKING)
+        if (frameDamagePropagationEnabled() && context.frameDamage) {
+            FloatRect damageRect(rect);
+            if (!clipBounds.isEmpty())
+                damageRect.intersect(clipBounds);
+
+            m_accumulatedOverlapRegionFrameDamage.unite(damageRect);
+        }
+#endif
         if (m_mask && filter) {
             // Mask and filter: the filter should be applied first and then the mask on the result.
             paintWithIntermediateSurface(canvas, context, rect, nullptr, [&](SkCanvas& canvas, PaintContext& context) {
@@ -635,6 +766,11 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
             });
         }
     }
+
+#if ENABLE(DAMAGE_TRACKING)
+    if (frameDamagePropagationEnabled() && context.frameDamage && !m_accumulatedOverlapRegionFrameDamage.isEmpty())
+        context.frameDamage->add(m_accumulatedOverlapRegionFrameDamage);
+#endif
 }
 
 Vector<IntRect, 1> SkiaCompositingLayer::computeConsolidatedOverlapRegionRects(const SkCanvas& canvas, const PaintContext& context, ComputeOverlapRegionMode mode)
