@@ -118,6 +118,10 @@ SkiaCompositingLayer& CoordinatedPlatformLayer::ensureSkiaTarget()
     ASSERT(!isMainThread());
     if (!m_skiaTarget)
         m_skiaTarget = SkiaCompositingLayer::create();
+#if ENABLE(DAMAGE_TRACKING)
+    if (m_damagePropagationEnabled)
+        m_skiaTarget->setSharedFrameDamage(m_damageInGlobalCoordinateSpace);
+#endif
     return *m_skiaTarget;
 }
 #endif
@@ -1242,7 +1246,7 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
 #if ENABLE(DAMAGE_TRACKING)
         if (m_pendingChanges.contains(Change::Damage)) {
             ASSERT(m_damage.has_value());
-            notImplemented();
+            layer.addDamage(*std::exchange(m_damage, std::nullopt));
             m_pendingChanges.remove(Change::Damage);
         }
 #endif
