@@ -148,7 +148,10 @@ void CoordinatedPlatformLayer::invalidateTarget()
     }
     m_target = nullptr;
 #if USE(SKIA)
-    m_skiaTarget = nullptr;
+    if (m_skiaTarget) {
+        m_skiaTarget->invalidate();
+        m_skiaTarget = nullptr;
+    }
 #endif
 }
 

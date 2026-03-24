@@ -65,6 +65,13 @@ Ref<SkiaCompositingLayer> SkiaCompositingLayer::create()
 
 SkiaCompositingLayer::~SkiaCompositingLayer() = default;
 
+void SkiaCompositingLayer::invalidate()
+{
+    for (auto& child : m_children)
+        child->m_parent = nullptr;
+    removeFromParent();
+}
+
 void SkiaCompositingLayer::setChildren(Vector<Ref<SkiaCompositingLayer>>&& newChildren)
 {
     if (m_children == newChildren)

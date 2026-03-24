@@ -58,6 +58,8 @@ public:
     static Ref<SkiaCompositingLayer> create();
     ~SkiaCompositingLayer();
 
+    void invalidate();
+
     void setSize(const FloatSize& size) { m_size = size; }
     void setPosition(const FloatPoint& point) { m_position = point; }
     void setAnchorPoint(const FloatPoint3D& point) { m_anchorPoint = point; }
