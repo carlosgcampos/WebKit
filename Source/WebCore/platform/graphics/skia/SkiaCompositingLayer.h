@@ -29,6 +29,7 @@
 #include "BoxExtents.h"
 #include "Color.h"
 #include "CoordinatedBackingStoreProxy.h"
+#include "Damage.h"
 #include "FloatPoint.h"
 #include "FloatPoint3D.h"
 #include "FloatRect.h"
@@ -38,6 +39,7 @@
 #include "TransformationMatrix.h"
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkCanvas.h>
+#include <skia/core/SkColorFilter.h>
 #include <skia/core/SkM44.h>
 #include <skia/effects/SkImageFilters.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
@@ -60,7 +62,7 @@ public:
 
     void invalidate();
 
-    void setSize(const FloatSize& size) { m_size = size; }
+    void setSize(const FloatSize&);
     void setPosition(const FloatPoint& point) { m_position = point; }
     void setAnchorPoint(const FloatPoint3D& point) { m_anchorPoint = point; }
     void setBoundsOrigin(const FloatPoint& point) { m_boundsOrigin = point; }
@@ -72,7 +74,7 @@ public:
     void setMasksToBounds(bool masksToBounds) { m_masksToBounds = masksToBounds; }
     void setContentsClippingRect(const FloatRoundedRect& rect) { m_contentsClippingRect = rect; }
     void setContentsRectClipsDescendants(bool clips) { m_contentsRectClipsDescendants = clips; }
-    void setOpacity(float opacity) { m_opacity = opacity; }
+    void setOpacity(float);
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
     void setAnimations(const TextureMapperAnimations& animations) { m_animations = animations; }
     void setContentsTiling(const FloatSize& size, const FloatSize& phase) { m_contentsTiling = { size, phase }; }
@@ -83,6 +85,11 @@ public:
     void setBackdropFiltersRect(const FloatRoundedRect&);
     void setIsBackdropRoot(bool isBackdropRoot) { m_isBackdropRoot = isBackdropRoot; }
     void setChildren(Vector<Ref<SkiaCompositingLayer>>&&);
+
+#if ENABLE(DAMAGE_TRACKING)
+    void setSharedFrameDamage(std::shared_ptr<Damage> frameDamage) { m_sharedFrameDamage = WTF::move(frameDamage); }
+    void addDamage(Damage&&);
+#endif
 
     void setUseBackingStore(bool, CoordinatedAnimatedBackingStoreClient* = nullptr);
     void updateBackingStore(CoordinatedBackingStoreProxy::Update&&, float);
@@ -95,7 +102,7 @@ public:
     const TransformationMatrix& toSurfaceTransform() const { return m_transforms.combined; }
     FloatRect effectiveLayerRect() const { return FloatRect({ }, m_size); }
 
-    bool paint(SkCanvas&);
+    bool paint(SkCanvas&, std::optional<Damage>&);
 
 private:
     SkiaCompositingLayer() = default;
@@ -110,11 +117,17 @@ private:
     bool computeTransformsAndAnimations(RefPtr<SkiaCompositingLayer>, MonotonicTime);
 
     struct PaintContext {
+        explicit PaintContext(std::optional<Damage>& damage)
+            : frameDamage(damage)
+        {
+        }
+
         float opacity { 1 };
         bool isMask { false };
         sk_sp<SkColorFilter> colorFilter;
         TransformationMatrix accumulatedReplicaTransform;
         RefPtr<SkiaCompositingLayer> paintingBackdropForLayer;
+        std::optional<Damage>& frameDamage;
     };
 
     struct Filter {
@@ -137,6 +150,23 @@ private:
 
     enum class IncludesReplica : bool { No, Yes };
     void computeOverlapRegions(ComputeOverlapRegionData&, const TransformationMatrix& accumulatedReplicaTransform, IncludesReplica = IncludesReplica::Yes);
+
+#if ENABLE(DAMAGE_TRACKING)
+    bool frameDamagePropagationEnabled() const { return !!m_sharedFrameDamage; }
+    void damageWholeLayer()
+    {
+        m_accumulatedOverlapRegionFrameDamage = { };
+        if (m_size.isEmpty())
+            return;
+
+        if (!m_layerDamage)
+            m_layerDamage = Damage(m_size, Damage::Mode::Full);
+        else
+            m_layerDamage->makeFull();
+    }
+    void addPreviousRectToSharedFrameDamage();
+    void recursiveAddPreviousRectToSharedFrameDamage(Ref<SkiaCompositingLayer>);
+#endif
 
     struct AnimationsState {
         std::optional<TransformationMatrix> transform;
@@ -198,6 +228,12 @@ private:
         TransformationMatrix combined;
         TransformationMatrix combinedForChildren;
     } m_transforms;
+#if ENABLE(DAMAGE_TRACKING)
+    std::shared_ptr<Damage> m_sharedFrameDamage;
+    std::optional<Damage> m_layerDamage;
+    std::optional<FloatRect> m_previousLayerRectInFrameCoordinates;
+    FloatRect m_accumulatedOverlapRegionFrameDamage;
+#endif
 };
 
 } // namespace WebCore

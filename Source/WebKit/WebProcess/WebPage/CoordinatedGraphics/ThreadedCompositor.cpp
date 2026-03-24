@@ -375,8 +375,25 @@ void ThreadedCompositor::paintToSkiaCanvas(const TransformationMatrix& matrix, c
     m_surface->clear(reasons);
 
     canvas->save();
-    bool sceneHasRunningAnimations = rootLayer.paint(*canvas);
+
+    std::optional<Damage> frameDamage;
+#if ENABLE(DAMAGE_TRACKING)
+    if (m_damage.flags)
+        frameDamage = Damage(size, m_damage.flags->contains(DamagePropagationFlags::Unified) ? Damage::Mode::BoundingBox : Damage::Mode::Rectangles);
+#endif
+
+    bool sceneHasRunningAnimations = rootLayer.paint(*canvas, frameDamage);
     canvas->restore();
+
+#if ENABLE(DAMAGE_TRACKING)
+    if (frameDamage) {
+        if (m_damage.shouldNotifyFrameDamageForTesting && m_layerTreeHost)
+            m_layerTreeHost->notifyFrameDamageForTesting(frameDamage->regionForTesting());
+
+        if (!frameDamage->isEmpty())
+            m_surface->setFrameDamage(WTF::move(*frameDamage));
+    }
+#endif
 
     if (auto* surface = canvas->getSurface())
         display.skiaGrContext()->flushAndSubmit(surface, GrSyncCpu::kNo);
