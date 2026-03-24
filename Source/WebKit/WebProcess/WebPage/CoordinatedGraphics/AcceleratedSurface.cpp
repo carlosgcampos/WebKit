@@ -1129,6 +1129,19 @@ void AcceleratedSurface::clear(const OptionSet<WebCore::CompositionReason>& reas
 {
     ASSERT(!RunLoop::isMain());
     auto backgroundColor = m_backgroundColor.load();
+
+    if (auto* surface = m_target ? m_target->skiaSurfaceIfExists() : nullptr) {
+        auto* canvas = surface->getCanvas();
+        ASSERT(canvas);
+        if (!isColorOpaque(backgroundColor))
+            canvas->clear(SK_ColorTRANSPARENT);
+        else if (reasons.contains(CompositionReason::AsyncScrolling)) {
+            auto [r, g, b, a] = backgroundColor;
+            canvas->clear(SkColor4f(r, g, b, a));
+        }
+        return;
+    }
+
     if (!isColorOpaque(backgroundColor)) {
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT);

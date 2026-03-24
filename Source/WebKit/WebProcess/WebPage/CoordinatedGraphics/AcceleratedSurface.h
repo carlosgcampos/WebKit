@@ -169,6 +169,7 @@ private:
         uint64_t id() const { return m_id; }
 
 #if USE(SKIA)
+        SkSurface* skiaSurfaceIfExists() const { return m_skiaSurface.get(); }
         virtual SkSurface* skiaSurface() { RELEASE_ASSERT_NOT_REACHED(); }
 #endif
 
