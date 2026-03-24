@@ -33,6 +33,8 @@
 #include "RenderProcessInfo.h"
 #include "WebPage.h"
 #include "WebProcess.h"
+#include <WebCore/Page.h>
+#include <WebCore/Settings.h>
 #include <WebCore/CoordinatedPlatformLayer.h>
 #include <WebCore/Damage.h>
 #include <WebCore/PlatformDisplay.h>
@@ -59,12 +61,6 @@ using namespace WebCore;
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(ThreadedCompositor);
 
-static bool useSkia()
-{
-    static const auto useSkiaForComposition = String::fromLatin1(getenv("WEBKIT_USE_SKIA_FOR_COMPOSITION"));
-    return !useSkiaForComposition.isEmpty() && useSkiaForComposition != "0"_s;
-}
-
 Ref<ThreadedCompositor> ThreadedCompositor::create(WebPage& webPage, LayerTreeHost& layerTreeHost, CoordinatedSceneState& sceneState)
 {
     return adoptRef(*new ThreadedCompositor(webPage, layerTreeHost, sceneState));
@@ -90,17 +86,22 @@ ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTre
 #endif
 
     updateSceneAttributes(webPage.size(), webPage.deviceScaleFactor());
+    bool useSkia = webPage.corePage()->settings().useSkiaForComposition();
+    if (!useSkia) {
+        auto envValue = String::fromLatin1(getenv("WEBKIT_USE_SKIA_FOR_COMPOSITION"));
+        useSkia = !envValue.isEmpty() && envValue != "0"_s;
+    }
 
     m_surface->didCreateCompositingRunLoop(m_workQueue->runLoop());
 
-    m_workQueue->dispatchSync([this] {
+    m_workQueue->dispatchSync([this, useSkia] {
         // GLNativeWindowType depends on the EGL implementation: reinterpret_cast works
         // for pointers (only if they are 64-bit wide and not for other cases), and static_cast for
         // numeric types (and when needed they get extended to 64-bit) but not for pointers. Using
         // a plain C cast expression in this one instance works in all cases.
         static_assert(sizeof(GLNativeWindowType) <= sizeof(uint64_t), "GLNativeWindowType must not be longer than 64 bits.");
         auto nativeSurfaceHandle = (GLNativeWindowType)m_surface->window();
-        if (useSkia() && !nativeSurfaceHandle) {
+        if (useSkia && !nativeSurfaceHandle) {
             // When using Skia for composition, use the thread-local SkiaGLContext from sharedDisplay()
             // instead of creating a separate GLContext. This avoids expensive context switching between
             // the compositor's context and Skia's context during paintToSkiaCanvas().
@@ -117,7 +118,7 @@ ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTre
                 m_flipY = !m_flipY;
             glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 
-            if (!useSkia())
+            if (!useSkia)
                 m_textureMapper = TextureMapper::create();
         }
     });
