@@ -372,6 +372,8 @@ void ThreadedCompositor::paintToSkiaCanvas(const TransformationMatrix& matrix, c
     if (m_context)
         display.skiaGLContext()->makeContextCurrent();
 
+    m_surface->clear(reasons);
+
     canvas->save();
     bool sceneHasRunningAnimations = rootLayer.paint(*canvas);
     canvas->restore();
