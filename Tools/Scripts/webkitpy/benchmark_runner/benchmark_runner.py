@@ -34,6 +34,12 @@ class BenchmarkRunner(object):
         if timeout_override:
             self._plan['timeout'] = timeout_override
         self._subtests = self.validate_subtests(subtests) if subtests else None
+        if not self._subtests and self._plan.get('default_subtests'):
+            default = self._plan['default_subtests']
+            if default is True:
+                default = self._plan.get('subtests', {})
+            self._subtests = self.validate_subtests(
+                BenchmarkRunner.format_subtests(default))
         self._browser_driver = BrowserDriverFactory.create(platform, browser, browser_args)
         self._browser_path = browser_path
         self._build_dir = os.path.abspath(build_dir) if build_dir else None
@@ -154,14 +160,15 @@ class BenchmarkRunner(object):
     def _construct_subtest_url(self, subtests):
         if not subtests or not isinstance(subtests, collections.abc.Mapping) or 'subtest_url_format' not in self._plan:
             return ''
+
         # As subtest URLs are concatenated directly, the format must account for this.
         # MotionMark and JetStream start with '&', while Speedometer uses ',' separated values.
         # If new plans are added, they must take this into account.
-        subtest_url = ''
+        parts = []
         for suite, tests in subtests.items():
             for test in tests:
-                subtest_url += self._plan['subtest_url_format'].replace('${SUITE}', suite).replace('${TEST}', test)
-        return subtest_url
+                parts.append(self._plan['subtest_url_format'].replace('${SUITE}', suite).replace('${TEST}', test))
+        return '&'.join(parts)
 
     def _run_one_test(self, web_root, test_file, iteration):
         raise NotImplementedError('BenchmarkRunner is an abstract class and shouldn\'t be instantiated.')
