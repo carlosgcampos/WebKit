@@ -186,7 +186,7 @@ void SkiaCompositingLayer::setReplica(RefPtr<SkiaCompositingLayer>&& replica)
         m_replica->m_replicatedLayer = this;
 }
 
-static sk_sp<SkImageFilter> createFilter(const FilterOperation& filterOperation, sk_sp<SkImageFilter> input)
+static sk_sp<SkImageFilter> createFilter(const FilterOperation& filterOperation, sk_sp<SkImageFilter> input, SkTileMode blurTileMode = SkTileMode::kDecal)
 {
     switch (filterOperation.type()) {
     case FilterOperation::Type::Grayscale: {
@@ -224,7 +224,7 @@ static sk_sp<SkImageFilter> createFilter(const FilterOperation& filterOperation,
     case FilterOperation::Type::Blur: {
         auto sigma = downcast<BlurFilterOperation>(filterOperation).stdDeviation();
         // FIXME: do we need to add crop rect?
-        return SkImageFilters::Blur(sigma, sigma, SkTileMode::kDecal, input);
+        return SkImageFilters::Blur(sigma, sigma, blurTileMode, input);
     }
     case FilterOperation::Type::DropShadow: {
         auto& dropShadow = downcast<DropShadowFilterOperation>(filterOperation);
@@ -239,11 +239,11 @@ static sk_sp<SkImageFilter> createFilter(const FilterOperation& filterOperation,
     return nullptr;
 }
 
-static sk_sp<SkImageFilter> createFilters(const FilterOperations& filterOperations)
+static sk_sp<SkImageFilter> createFilters(const FilterOperations& filterOperations, SkTileMode blurTileMode = SkTileMode::kDecal)
 {
     sk_sp<SkImageFilter> filter;
     for (const auto& filterOperation : filterOperations)
-        filter = createFilter(filterOperation, filter);
+        filter = createFilter(filterOperation, filter, blurTileMode);
     return filter;
 }
 
@@ -257,7 +257,7 @@ void SkiaCompositingLayer::setFilters(const FilterOperations& filterOperations)
 
 void SkiaCompositingLayer::setBackdropFilters(const FilterOperations& filterOperations)
 {
-    m_backdrop.filter = createFilters(filterOperations);
+    m_backdrop.filter = createFilters(filterOperations, SkTileMode::kClamp);
 }
 
 void SkiaCompositingLayer::setBackdropFiltersRect(const FloatRoundedRect& clipRect)
