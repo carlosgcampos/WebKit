@@ -661,7 +661,7 @@ bool SkiaCompositingLayer::isVisible() const
         return false;
     if (!m_contentsVisible && m_children.isEmpty())
         return false;
-    if (!hasVisualContent() && m_children.isEmpty())
+    if (!hasVisualContent() && !m_backdrop.filter && m_children.isEmpty())
         return false;
     if (opacity() < s_opacityVisibilityThreshold)
         return false;
