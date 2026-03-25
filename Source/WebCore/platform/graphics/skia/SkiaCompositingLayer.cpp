@@ -894,7 +894,8 @@ void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<Ref<SkiaCompos
 {
     if (m_preserves3D || isLeafOf3DRenderingContext()) {
         // Add layers to 3d rendering context only if they get actually painted.
-        if (isVisible() && ((filter() || m_backdrop.filter) || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
+        bool hasVisualContentOrFilters = hasVisualContent() || filter() || m_backdrop.filter;
+        if (isVisible() && (hasVisualContentOrFilters || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
             layers.append(Ref { *this });
 
         // Stop recursion on 3d rendering context leaf
