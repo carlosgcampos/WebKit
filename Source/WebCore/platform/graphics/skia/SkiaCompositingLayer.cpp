@@ -887,15 +887,14 @@ void SkiaCompositingLayer::paintUsingOverlapRegions(SkCanvas& canvas, PaintConte
 bool SkiaCompositingLayer::hasVisualContent() const
 {
     return m_backingStore || m_imageBackingStore || m_contentsBuffer
-        || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible())
-        || filter() || m_backdrop.filter;
+        || (m_contentsSolidColor.isValid() && m_contentsSolidColor.isVisible());
 }
 
 void SkiaCompositingLayer::collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>& layers)
 {
     if (m_preserves3D || isLeafOf3DRenderingContext()) {
         // Add layers to 3d rendering context only if they get actually painted.
-        if (isVisible() && (hasVisualContent() || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
+        if (isVisible() && ((filter() || m_backdrop.filter) || (isLeafOf3DRenderingContext() && !m_children.isEmpty())))
             layers.append(Ref { *this });
 
         // Stop recursion on 3d rendering context leaf
