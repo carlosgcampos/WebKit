@@ -617,6 +617,7 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
         // exclude the root's own effects (replica, filter, mask) per the CSS spec.
         SkPaint paint;
         paint.setImageFilter(m_backdrop.filter);
+        paint.setAlphaf(context.opacity);
         paintWithIntermediateSurface(canvas, context, enclosingIntRect(clipTransform.mapRect(m_backdrop.clipRect.rect())), &paint, [&](SkCanvas& canvas, PaintContext& context) {
             SetForScope scopedPaintBackdropForLayer(context.paintingBackdropForLayer, this);
             SetForScope scopedOpacity(context.opacity, 1.f);
