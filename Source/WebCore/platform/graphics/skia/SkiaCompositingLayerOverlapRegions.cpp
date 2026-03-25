@@ -241,12 +241,11 @@ void SkiaCompositingLayerOverlapRegions::paint(SkCanvas& canvas, float opacity, 
     auto ctm = canvas.getLocalToDevice();
 
     for (const auto& rect : nonOverlapRegion.rects()) {
-        canvas.save();
+        SkAutoCanvasRestore autoRestore(&canvas, true);
         canvas.resetMatrix();
         canvas.clipIRect(SkIRect::MakeLTRB(rect.x(), rect.y(), rect.maxX(), rect.maxY()));
         canvas.setMatrix(ctm);
         paintContent(opacity);
-        canvas.restore();
     }
 
     auto overlapRects = overlapRegion.rects();
@@ -259,14 +258,12 @@ void SkiaCompositingLayerOverlapRegions::paint(SkCanvas& canvas, float opacity, 
     SkPaint layerPaint;
     layerPaint.setAlphaf(opacity);
     for (const auto& rect : overlapRects) {
-        canvas.save();
+        SkAutoCanvasRestore autoRestore(&canvas, true);
         canvas.resetMatrix();
         auto skRect = SkRect::MakeLTRB(rect.x(), rect.y(), rect.maxX(), rect.maxY());
         canvas.saveLayer(&skRect, &layerPaint);
         canvas.setMatrix(ctm);
         paintContent(1.0);
-        canvas.restore();
-        canvas.restore();
     }
 }
 
