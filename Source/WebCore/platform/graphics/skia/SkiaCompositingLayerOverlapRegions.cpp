@@ -264,7 +264,6 @@ void SkiaCompositingLayerOverlapRegions::paint(SkCanvas& canvas, float opacity, 
         canvas.saveLayer(&skRect, &layerPaint);
         canvas.setMatrix(ctm);
         paintContent(1.0);
-        canvas.restore();
     }
 }
 
