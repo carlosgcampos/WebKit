@@ -130,6 +130,8 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
     if (m_tiles.isEmpty())
         return;
 
+    FloatRect layerRect = { { }, m_size };
+
     sk_sp<SkColorFilter> bgraFilter;
     auto tilePaint = paint;
     for (auto& tile : m_tiles.values()) {
@@ -139,6 +141,8 @@ void CoordinatedBackingStore::paintToCanvas(SkCanvas& canvas, const SkPaint& pai
         const auto& image = tile.ensureSkImage();
         if (!image)
             continue;
+
+        tilePaint.setAntiAlias(allTileEdgesExposed(layerRect, tile.rect()));
 
         if (tile.texture().colorConvertFlags().contains(TextureMapperFlags::ShouldConvertTextureBGRAToRGBA)) {
             if (!bgraFilter) {
