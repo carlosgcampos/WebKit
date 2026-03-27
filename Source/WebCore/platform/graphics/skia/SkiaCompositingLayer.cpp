@@ -468,6 +468,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
+    paint.setAntiAlias(true);
     paint.setAlphaf(context.opacity);
     if (context.isMask)
         paint.setBlendMode(SkBlendMode::kDstIn);
