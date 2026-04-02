@@ -468,7 +468,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
-    paint.setAntiAlias(true);
+    paint.setAntiAlias(context.antialias);
     paint.setAlphaf(context.opacity);
     if (context.isMask)
         paint.setBlendMode(SkBlendMode::kDstIn);
@@ -649,6 +649,7 @@ void SkiaCompositingLayer::paintSelfAndChildren(SkCanvas& canvas, PaintContext& 
             builder.addRect(SkRect(effectiveLayerRect()));
             canvas.clipPath(builder.detach().makeTransform(SkM44(clipTransform).asM33()));
         }
+        context.antialias = false;
     }
 
     for (auto& child : m_children)

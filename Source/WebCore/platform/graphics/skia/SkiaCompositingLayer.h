@@ -124,6 +124,7 @@ private:
 
         float opacity { 1 };
         bool isMask { false };
+        bool antialias { true };
         sk_sp<SkColorFilter> colorFilter;
         TransformationMatrix accumulatedReplicaTransform;
         RefPtr<SkiaCompositingLayer> paintingBackdropForLayer;
