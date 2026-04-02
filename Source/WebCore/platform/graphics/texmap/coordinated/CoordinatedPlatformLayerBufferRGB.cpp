@@ -100,14 +100,15 @@ void CoordinatedPlatformLayerBufferRGB::paintToCanvas(SkCanvas& canvas, const Fl
         else
             imagePaint.setColorFilter(bgraFilter);
     }
-    if (m_flags.contains(TextureMapperFlags::ShouldFlipTexture)) {
-        canvas.save();
+    bool shouldFlip = m_flags.contains(TextureMapperFlags::ShouldFlipTexture);
+    SkAutoCanvasRestore autoRestore(&canvas, shouldFlip);
+    if (shouldFlip) {
         canvas.translate(0, targetRect.height());
         canvas.scale(1, -1);
     }
-    canvas.drawImageRect(image, SkRect::MakeWH(m_size.width(), m_size.height()), targetRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &imagePaint, SkCanvas::kFast_SrcRectConstraint);
-    if (m_flags.contains(TextureMapperFlags::ShouldFlipTexture))
-        canvas.restore();
+    SkRect srcRect = SkRect::MakeWH(m_size.width(), m_size.height());
+    SkRect dstRect = SkRect::MakeXYWH(targetRect.x(), shouldFlip ? -targetRect.y() : targetRect.y(), targetRect.width(), targetRect.height());
+    canvas.drawImageRect(image, srcRect, dstRect, SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone), &imagePaint, SkCanvas::kFast_SrcRectConstraint);
 }
 #endif
 
