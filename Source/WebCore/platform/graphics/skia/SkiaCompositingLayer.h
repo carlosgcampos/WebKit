@@ -170,6 +170,7 @@ private:
 
     struct AnimationsState {
         std::optional<TransformationMatrix> transform;
+        std::optional<TransformationMatrix> futureTransform;
         std::optional<float> opacity;
         std::optional<Filter> filter;
         bool isRunning { false };
@@ -177,6 +178,7 @@ private:
     std::optional<AnimationsState> syncAnimations(MonotonicTime);
 
     const TransformationMatrix& localTransform() const;
+    const TransformationMatrix& futureLocalTransform() const;
     float opacity() const;
     const std::optional<Filter> filter() const;
 
@@ -227,6 +229,8 @@ private:
     struct {
         TransformationMatrix combined;
         TransformationMatrix combinedForChildren;
+        TransformationMatrix futureCombined;
+        TransformationMatrix futureCombinedForChildren;
     } m_transforms;
 #if ENABLE(DAMAGE_TRACKING)
     std::shared_ptr<Damage> m_sharedFrameDamage;
