@@ -328,6 +328,14 @@ const TransformationMatrix& SkiaCompositingLayer::localTransform() const
     return m_animationsState->transform ? m_animationsState->transform.value() : m_transform;
 }
 
+const TransformationMatrix& SkiaCompositingLayer::futureLocalTransform() const
+{
+    if (!m_animationsState || !m_animationsState->isRunning)
+        return m_transform;
+
+    return m_animationsState->futureTransform ? m_animationsState->futureTransform.value() : localTransform();
+}
+
 float SkiaCompositingLayer::opacity() const
 {
     if (!m_animationsState || !m_animationsState->isRunning)
@@ -354,6 +362,12 @@ std::optional<SkiaCompositingLayer::AnimationsState> SkiaCompositingLayer::syncA
 
     AnimationsState state;
     state.transform = applicationResults.transform;
+    if (state.transform) {
+        // Calculate localTransform 50ms in the future.
+        TextureMapperAnimation::ApplicationResult futureResults;
+        m_animations.apply(futureResults, time + 50_ms, TextureMapperAnimation::KeepInternalState::Yes);
+        state.futureTransform = futureResults.transform;
+    }
     state.opacity = applicationResults.opacity;
 #if ENABLE(DAMAGE_TRACKING)
     const bool currentOpacity = opacity();
@@ -401,6 +415,26 @@ bool SkiaCompositingLayer::computeTransformsAndAnimations(RefPtr<SkiaCompositing
         m_transforms.combinedForChildren.multiply(m_childrenTransform);
         m_transforms.combinedForChildren.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
 
+        TransformationMatrix futureParentTransform;
+        if (parent)
+            futureParentTransform = parent == m_parent ? parent->m_transforms.futureCombinedForChildren : parent->m_transforms.futureCombined;
+
+        m_transforms.futureCombined = futureParentTransform;
+        m_transforms.futureCombined
+            .translate3d(origin.x() + (m_position.x() - m_boundsOrigin.x()), origin.y() + (m_position.y() - m_boundsOrigin.y()), m_anchorPoint.z())
+            .multiply(futureLocalTransform());
+
+        m_transforms.futureCombinedForChildren = m_transforms.futureCombined;
+        m_transforms.futureCombined.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
+
+        if (isReplica())
+            m_transforms.futureCombined.translate(-m_position.x(), -m_position.y());
+
+        if (!m_preserves3D)
+            m_transforms.futureCombinedForChildren.flatten();
+        m_transforms.futureCombinedForChildren.multiply(m_childrenTransform);
+        m_transforms.futureCombinedForChildren.translate3d(-origin.x(), -origin.y(), -m_anchorPoint.z());
+
 #if ENABLE(DAMAGE_TRACKING)
         if (frameDamagePropagationEnabled() && previousTransform != m_transforms.combined) {
             damageWholeLayer();
@@ -410,10 +444,8 @@ bool SkiaCompositingLayer::computeTransformsAndAnimations(RefPtr<SkiaCompositing
 
         m_visible = m_backfaceVisibility || !m_transforms.combined.isBackFaceVisible();
 
-        if (m_animatedBackingStoreClient) {
-            // FIXME: use future combined.
-            m_animatedBackingStoreClient->requestBackingStoreUpdateIfNeeded(m_transforms.combined);
-        }
+        if (m_animatedBackingStoreClient)
+            m_animatedBackingStoreClient->requestBackingStoreUpdateIfNeeded(m_transforms.futureCombined);
     }
 
     if (m_mask)
