@@ -35,6 +35,7 @@
 #include "CoordinatedPlatformLayerBuffer.h"
 #include "CoordinatedTileBuffer.h"
 #include "FilterOperations.h"
+#include "FloatQuad.h"
 #include "FontCache.h"
 #include "PlatformDisplay.h"
 #include "Region.h"
@@ -785,6 +786,22 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
             m_accumulatedOverlapRegionFrameDamage.unite(damageRect);
         }
 #endif
+
+        auto paintMask = [&]() {
+            TransformationMatrix transform(context.accumulatedReplicaTransform);
+            transform.multiply(m_mask->m_transforms.combined);
+            if (transform.mapQuad(m_mask->effectiveLayerRect()).isRectilinear()) {
+                SetForScope scopedMask(context.isMask, true);
+                m_mask->paintSelf(canvas, context);
+            } else {
+                SkPaint maskPaint;
+                maskPaint.setBlendMode(SkBlendMode::kDstIn);
+                paintWithIntermediateSurface(canvas, context, rect, &maskPaint, [&](SkCanvas& canvas, PaintContext& context) {
+                    m_mask->paintSelf(canvas, context);
+                });
+            }
+        };
+        
         if (m_mask && filter) {
             // Mask and filter: the filter should be applied first and then the mask on the result.
             paintWithIntermediateSurface(canvas, context, rect, nullptr, [&](SkCanvas& canvas, PaintContext& context) {
@@ -792,16 +809,14 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
                     paintSelfAndChildren(canvas, context);
                 });
 
-                SetForScope scopedMask(context.isMask, true);
-                m_mask->paintSelf(canvas, context);
+                paintMask();
             });
         } else {
             paintWithIntermediateSurface(canvas, context, rect, &paint, [&](SkCanvas& canvas, PaintContext& context) {
                 paintSelfAndChildren(canvas, context);
 
                 if (m_mask) {
-                    SetForScope scopedMask(context.isMask, true);
-                    m_mask->paintSelf(canvas, context);
+                    paintMask();
                 }
             });
         }
