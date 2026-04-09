@@ -919,11 +919,40 @@ void SkiaCompositingLayer::paintUsingOverlapRegions(SkCanvas& canvas, PaintConte
     };
     computeOverlapRegions(data, context.accumulatedReplicaTransform);
 
-    SkiaCompositingLayerOverlapRegions::paint(canvas, context.opacity, data,
-        [&](float effectiveOpacity) {
-            SetForScope scopedOpacity(context.opacity, effectiveOpacity);
+    if (data.overlapRegion.isEmpty()) {
+        paintSelfAndChildrenWithReplicaFilterAndMask(canvas, context);
+        return;
+    }
+
+    // Having both overlap and non-overlap regions carries some overhead.
+    // Avoid it if the overlap area is big anyway.
+    if (data.overlapRegion.totalArea() > data.nonOverlapRegion.totalArea()) {
+        data.overlapRegion.unite(data.nonOverlapRegion);
+        data.nonOverlapRegion = Region();
+    }
+
+    for (const auto& rect : data.nonOverlapRegion.rects()) {
+        SkAutoCanvasRestore autoRestore(&canvas, true);
+        canvas.clipIRect(SkIRect::MakeLTRB(rect.x(), rect.y(), rect.maxX(), rect.maxY()));
+        paintSelfAndChildrenWithReplicaFilterAndMask(canvas, context);
+    }
+
+    auto overlapRects = data.overlapRegion.rects();
+    static constexpr size_t cOverlapRegionConsolidationThreshold = 4;
+    if (data.nonOverlapRegion.isEmpty() && overlapRects.size() > cOverlapRegionConsolidationThreshold) {
+        overlapRects.clear();
+        overlapRects.append(data.overlapRegion.bounds());
+    }
+
+    SkPaint layerPaint;
+    layerPaint.setAlphaf(context.opacity);
+    for (const auto& rect : overlapRects) {
+        SkAutoCanvasRestore autoRestore(&canvas, true);
+        paintWithIntermediateSurface(canvas, context, rect, &layerPaint, [&](SkCanvas& canvas, PaintContext& context) {
+            SetForScope scopedOpacity(context.opacity, 1);
             paintSelfAndChildrenWithReplicaFilterAndMask(canvas, context);
         });
+    }
 }
 
 bool SkiaCompositingLayer::hasVisualContent() const

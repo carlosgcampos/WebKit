@@ -29,6 +29,8 @@
 #include "SkiaCompositingLayerOverlapRegions.h"
 
 #if USE(SKIA)
+#include "FloatRect.h"
+#include "TransformationMatrix.h"
 #include <array>
 
 namespace WebCore {
@@ -216,55 +218,6 @@ IntRect ComputeOverlapRegionData::transformedBoundingBox(const TransformationMat
     }
     ASSERT_NOT_REACHED();
     return { };
-}
-
-void SkiaCompositingLayerOverlapRegions::paint(SkCanvas& canvas, float opacity, ComputeOverlapRegionData& data,
-    const Function<void(float effectiveOpacity)>& paintContent)
-{
-    auto& overlapRegion = data.overlapRegion;
-    auto& nonOverlapRegion = data.nonOverlapRegion;
-    if (overlapRegion.isEmpty()) {
-        paintContent(opacity);
-        return;
-    }
-
-    // Having both overlap and non-overlap regions carries some overhead.
-    // Avoid it if the overlap area is big anyway.
-    if (overlapRegion.totalArea() > nonOverlapRegion.totalArea()) {
-        overlapRegion.unite(nonOverlapRegion);
-        nonOverlapRegion = Region();
-    }
-
-    // Overlap regions are computed in device coordinates. Apply clips in device
-    // space by temporarily resetting the matrix, then restore it for painting.
-    // This matches TextureMapperLayer which clips with an identity transform.
-    auto ctm = canvas.getLocalToDevice();
-
-    for (const auto& rect : nonOverlapRegion.rects()) {
-        SkAutoCanvasRestore autoRestore(&canvas, true);
-        canvas.resetMatrix();
-        canvas.clipIRect(SkIRect::MakeLTRB(rect.x(), rect.y(), rect.maxX(), rect.maxY()));
-        canvas.setMatrix(ctm);
-        paintContent(opacity);
-    }
-
-    auto overlapRects = overlapRegion.rects();
-    static constexpr size_t cOverlapRegionConsolidationThreshold = 4;
-    if (nonOverlapRegion.isEmpty() && overlapRects.size() > cOverlapRegionConsolidationThreshold) {
-        overlapRects.clear();
-        overlapRects.append(overlapRegion.bounds());
-    }
-
-    SkPaint layerPaint;
-    layerPaint.setAlphaf(opacity);
-    for (const auto& rect : overlapRects) {
-        SkAutoCanvasRestore autoRestore(&canvas, true);
-        canvas.resetMatrix();
-        auto skRect = SkRect::MakeLTRB(rect.x(), rect.y(), rect.maxX(), rect.maxY());
-        canvas.saveLayer(&skRect, &layerPaint);
-        canvas.setMatrix(ctm);
-        paintContent(1.0);
-    }
 }
 
 } // namespace WebCore
