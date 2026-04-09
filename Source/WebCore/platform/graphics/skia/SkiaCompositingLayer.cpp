@@ -554,7 +554,7 @@ void SkiaCompositingLayer::paintSelf(SkCanvas& canvas, PaintContext& context)
 #if ENABLE(DAMAGE_TRACKING)
     if (frameDamagePropagationEnabled() && context.frameDamage) {
         m_previousLayerRectInFrameCoordinates = transform.mapRect(effectiveLayerRect());
-        auto clipBounds = FloatRect(SkRect::Make(canvas.getDeviceClipBounds()));
+        auto clipBounds = FloatRect(this->clipBounds(canvas, context));
         if (!clipBounds.isEmpty())
             m_previousLayerRectInFrameCoordinates->intersect(clipBounds);
 
@@ -708,6 +708,13 @@ TransformationMatrix SkiaCompositingLayer::replicaTransform() const
         .multiply(m_transforms.combined.inverse().value_or(TransformationMatrix()));
 }
 
+IntRect SkiaCompositingLayer::clipBounds(const SkCanvas& canvas, const PaintContext& context) const
+{
+    IntRect clip = canvas.getDeviceClipBounds();
+    clip.move(context.offset);
+    return clip;
+}
+
 void SkiaCompositingLayer::paintWithIntermediateSurface(SkCanvas& canvas, PaintContext& context, const IntRect& contentsRect, SkPaint* paint, PaintFunction&& paintFunction)
 {
     auto texture = BitmapTexturePool::singleton().acquireTexture(contentsRect.size(), { BitmapTexture::Flags::SupportsAlpha });
@@ -728,6 +735,7 @@ void SkiaCompositingLayer::paintWithIntermediateSurface(SkCanvas& canvas, PaintC
 
     surfaceCanvas->clear(SK_ColorTRANSPARENT);
     surfaceCanvas->translate(-contentsRect.x(), -contentsRect.y());
+    SetForScope scopedOffset(context.offset, toIntSize(contentsRect.location()));
     paintFunction(*surfaceCanvas, context);
     grContext->flushAndSubmit(surface.get(), GrSyncCpu::kNo);
 
@@ -760,7 +768,7 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
     auto overlapRects = computeConsolidatedOverlapRegionRects(canvas, context, mode);
 
 #if ENABLE(DAMAGE_TRACKING)
-    auto clipBounds = FloatRect(SkRect::Make(canvas.getDeviceClipBounds()));
+    auto clipBounds = FloatRect(this->clipBounds(canvas, context));
     TransformationMatrix transform(context.accumulatedReplicaTransform);
     transform.multiply(m_transforms.combined);
 #endif
@@ -811,7 +819,7 @@ Vector<IntRect, 1> SkiaCompositingLayer::computeConsolidatedOverlapRegionRects(c
 {
     ComputeOverlapRegionData data {
         .mode = mode,
-        .clipBounds = canvas.getDeviceClipBounds(),
+        .clipBounds = clipBounds(canvas, context),
         .overlapRegion = { },
         .nonOverlapRegion = { }
     };
@@ -905,7 +913,7 @@ void SkiaCompositingLayer::paintUsingOverlapRegions(SkCanvas& canvas, PaintConte
 {
     ComputeOverlapRegionData data {
         .mode = ComputeOverlapRegionMode::Intersection,
-        .clipBounds = canvas.getDeviceClipBounds(),
+        .clipBounds = clipBounds(canvas, context),
         .overlapRegion = { },
         .nonOverlapRegion = { }
     };
