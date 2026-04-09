@@ -124,6 +124,7 @@ private:
 
         float opacity { 1 };
         bool isMask { false };
+        IntSize offset;
         sk_sp<SkColorFilter> colorFilter;
         TransformationMatrix accumulatedReplicaTransform;
         RefPtr<SkiaCompositingLayer> paintingBackdropForLayer;
@@ -146,6 +147,7 @@ private:
     void paintUsing3DRenderingContext(SkCanvas&, PaintContext&);
     Vector<IntRect, 1> computeConsolidatedOverlapRegionRects(const SkCanvas&, const PaintContext&, ComputeOverlapRegionMode);
     TransformationMatrix replicaTransform() const;
+    IntRect clipBounds(const SkCanvas&, const PaintContext&) const;
     void collect3DRenderingContextLayers(Vector<Ref<SkiaCompositingLayer>>&);
 
     enum class IncludesReplica : bool { No, Yes };
