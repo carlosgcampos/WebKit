@@ -769,8 +769,6 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
 
 #if ENABLE(DAMAGE_TRACKING)
     auto clipBounds = FloatRect(this->clipBounds(canvas, context));
-    TransformationMatrix transform(context.accumulatedReplicaTransform);
-    transform.multiply(m_transforms.combined);
 #endif
 
     SkPaint paint;
