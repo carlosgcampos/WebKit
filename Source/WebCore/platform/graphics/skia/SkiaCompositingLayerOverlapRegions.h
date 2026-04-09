@@ -27,16 +27,12 @@
 #pragma once
 
 #if USE(SKIA)
-#include "FloatRect.h"
 #include "IntRect.h"
 #include "Region.h"
-#include "TransformationMatrix.h"
-WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
-#include <skia/core/SkCanvas.h>
-WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
-#include <wtf/Function.h>
 
 namespace WebCore {
+class FloatRect;
+class TransformationMatrix;
 
 enum class ComputeOverlapRegionMode : uint8_t {
     Intersection,
@@ -52,12 +48,6 @@ struct ComputeOverlapRegionData {
 
     void resolveOverlaps(const IntRect&);
     IntRect transformedBoundingBox(const TransformationMatrix&, const FloatRect&) const;
-};
-
-class SkiaCompositingLayerOverlapRegions {
-public:
-    static void paint(SkCanvas&, float opacity, ComputeOverlapRegionData&,
-        const Function<void(float effectiveOpacity)>& paintContent);
 };
 
 } // namespace WebCore
