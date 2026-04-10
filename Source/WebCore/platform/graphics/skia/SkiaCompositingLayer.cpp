@@ -787,17 +787,17 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
         }
 #endif
 
-        auto paintMask = [&]() {
+        auto paintMask = [this](RefPtr<SkiaCompositingLayer> mask, SkCanvas& canvas, PaintContext& context, const IntRect& rect) {
             TransformationMatrix transform(context.accumulatedReplicaTransform);
-            transform.multiply(m_mask->m_transforms.combined);
-            if (transform.mapQuad(m_mask->effectiveLayerRect()).isRectilinear()) {
+            transform.multiply(mask->m_transforms.combined);
+            if (transform.mapQuad(mask->effectiveLayerRect()).isRectilinear()) {
                 SetForScope scopedMask(context.isMask, true);
-                m_mask->paintSelf(canvas, context);
+                mask->paintSelf(canvas, context);
             } else {
                 SkPaint maskPaint;
                 maskPaint.setBlendMode(SkBlendMode::kDstIn);
                 paintWithIntermediateSurface(canvas, context, rect, &maskPaint, [&](SkCanvas& canvas, PaintContext& context) {
-                    m_mask->paintSelf(canvas, context);
+                    mask->paintSelf(canvas, context);
                 });
             }
         };
@@ -809,14 +809,14 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
                     paintSelfAndChildren(canvas, context);
                 });
 
-                paintMask();
+                paintMask(m_mask, canvas, context, rect);
             });
         } else {
             paintWithIntermediateSurface(canvas, context, rect, &paint, [&](SkCanvas& canvas, PaintContext& context) {
                 paintSelfAndChildren(canvas, context);
 
                 if (m_mask) {
-                    paintMask();
+                    paintMask(m_mask, canvas, context, rect);
                 }
             });
         }
