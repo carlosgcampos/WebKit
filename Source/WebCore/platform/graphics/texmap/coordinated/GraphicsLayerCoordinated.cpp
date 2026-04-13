@@ -50,6 +50,22 @@ namespace WebCore {
 
 static constexpr uint32_t s_maxDamageRectanglesForHighResolutionDamage = 32;
 
+bool GraphicsLayer::supportsLayerType(Type type)
+{
+    switch (type) {
+    case Type::Normal:
+    case Type::Structural:
+    case Type::PageTiledBacking:
+    case Type::ScrollContainer:
+    case Type::ScrolledContents:
+    case Type::TiledBacking:
+        return true;
+    case Type::Shape:
+        return true;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
 Ref<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, GraphicsLayerClient& client, Type layerType)
 {
     if (factory)
@@ -489,6 +505,22 @@ void GraphicsLayerCoordinated::setEventRegion(EventRegion&& eventRegion)
 
     GraphicsLayer::setEventRegion(WTF::move(eventRegion));
     noteLayerPropertyChanged(Change::EventRegion, ScheduleFlush::Yes);
+}
+
+void GraphicsLayerCoordinated::setShapeLayerPath(const Path& path)
+{
+    // FIXME: need to check for path equality. No bool Path::operator==(const Path&)!.
+    GraphicsLayer::setShapeLayerPath(path);
+    noteLayerPropertyChanged(Change::Shape, ScheduleFlush::Yes);
+}
+
+void GraphicsLayerCoordinated::setShapeLayerWindRule(WindRule windRule)
+{
+    if (m_shapeLayerWindRule == windRule)
+        return;
+
+    GraphicsLayer::setShapeLayerWindRule(windRule);
+    noteLayerPropertyChanged(Change::Shape, ScheduleFlush::Yes);
 }
 
 void GraphicsLayerCoordinated::deviceOrPageScaleFactorChanged()
@@ -1117,6 +1149,9 @@ void GraphicsLayerCoordinated::commitLayerChanges(CommitState& commitState, floa
 
     if (m_pendingChanges.contains(Change::EventRegion))
         m_platformLayer->setEventRegion(m_eventRegion);
+
+    if (m_pendingChanges.contains(Change::Shape))
+        m_platformLayer->setClipPath(m_shapeLayerPath, m_shapeLayerWindRule);
 
     if (m_pendingChanges.contains(Change::DebugIndicators))
         updateIndicators();

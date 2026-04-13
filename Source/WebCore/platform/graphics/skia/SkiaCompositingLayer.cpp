@@ -745,13 +745,21 @@ void SkiaCompositingLayer::paintWithIntermediateSurface(SkCanvas& canvas, PaintC
 
 void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canvas, PaintContext& context)
 {
+    auto mask = m_mask;
+    const bool shouldClipPath = mask && !mask->m_clipPath.isEmpty();
+    SkAutoCanvasRestore autoRestore(&canvas, shouldClipPath);
+    if (shouldClipPath) {
+        canvas.clipPath(mask->m_clipPath.makeTransform(SkM44(mask->m_transforms.combined).asM33()), true);
+        mask = nullptr;
+    }
+
     auto filter = this->filter();
-    if (!filter && !m_mask) {
+    if (!filter && !mask) {
         paintSelfAndChildren(canvas, context);
         return;
     }
 
-    if (filter && !m_mask) {
+    if (filter && !mask) {
         SkColorFilter* colorFilterPtr = nullptr;
         if (filter->filter->asAColorFilter(&colorFilterPtr)) {
             // If we have a filter (and no mask) that can be simplified as a color filter
@@ -765,7 +773,7 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
 
     // Restrict intermediate surface size to the consolidated overlap region rects,
     // matching TextureMapperLayer::paintSelfChildrenFilterAndMask behavior.
-    auto mode = m_mask ? ComputeOverlapRegionMode::Mask : ComputeOverlapRegionMode::Union;
+    auto mode = mask ? ComputeOverlapRegionMode::Mask : ComputeOverlapRegionMode::Union;
     auto overlapRects = computeConsolidatedOverlapRegionRects(canvas, context, mode);
 
 #if ENABLE(DAMAGE_TRACKING)
@@ -801,22 +809,22 @@ void SkiaCompositingLayer::paintSelfAndChildrenWithFilterAndMask(SkCanvas& canva
                 });
             }
         };
-        
-        if (m_mask && filter) {
+
+        if (mask && filter) {
             // Mask and filter: the filter should be applied first and then the mask on the result.
             paintWithIntermediateSurface(canvas, context, rect, nullptr, [&](SkCanvas& canvas, PaintContext& context) {
                 paintWithIntermediateSurface(canvas, context, rect, &paint, [&](SkCanvas& canvas, PaintContext& context) {
                     paintSelfAndChildren(canvas, context);
                 });
 
-                paintMask(m_mask, canvas, context, rect);
+                paintMask(mask, canvas, context, rect);
             });
         } else {
             paintWithIntermediateSurface(canvas, context, rect, &paint, [&](SkCanvas& canvas, PaintContext& context) {
                 paintSelfAndChildren(canvas, context);
 
-                if (m_mask) {
-                    paintMask(m_mask, canvas, context, rect);
+                if (mask) {
+                    paintMask(mask, canvas, context, rect);
                 }
             });
         }

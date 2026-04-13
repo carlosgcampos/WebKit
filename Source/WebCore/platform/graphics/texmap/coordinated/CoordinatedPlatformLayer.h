@@ -178,6 +178,8 @@ public:
     void setEventRegion(const EventRegion&);
     const EventRegion& eventRegion() const;
 
+    void setClipPath(const Path&, WindRule);
+
     void setDebugBorder(Color&&, float);
     void setShowRepaintCounter(bool);
 
@@ -241,19 +243,20 @@ private:
         ContentsBuffer               = 1LLU << 19,
         ContentsImage                = 1LLU << 20,
         ContentsColor                = 1LLU << 21,
-        Filters                      = 1LLU << 22,
-        Mask                         = 1LLU << 23,
-        Replica                      = 1LLU << 24,
-        Backdrop                     = 1LLU << 25,
-        BackdropRect                 = 1LLU << 26,
-        BackdropRoot                 = 1LLU << 27,
-        Animations                   = 1LLU << 28,
-        DebugIndicators              = 1LLU << 29,
+        ClipPath                     = 1LLU << 22,
+        Filters                      = 1LLU << 23,
+        Mask                         = 1LLU << 24,
+        Replica                      = 1LLU << 25,
+        Backdrop                     = 1LLU << 26,
+        BackdropRect                 = 1LLU << 27,
+        BackdropRoot                 = 1LLU << 28,
+        Animations                   = 1LLU << 29,
+        DebugIndicators              = 1LLU << 30,
 #if ENABLE(DAMAGE_TRACKING)
-        Damage                       = 1LLU << 30,
+        Damage                       = 1LLU << 31,
 #endif
 #if ENABLE(SCROLLING_THREAD)
-        ScrollingNode                = 1LLU << 31
+        ScrollingNode                = 1LLU << 32
 #endif
     };
 
@@ -311,6 +314,10 @@ private:
         std::unique_ptr<CoordinatedPlatformLayerBuffer> pending;
         std::unique_ptr<CoordinatedPlatformLayerBuffer> committed;
     } m_contentsBuffer WTF_GUARDED_BY_LOCK(m_lock);
+    struct {
+        Path path;
+        WindRule windRule;
+    } m_clipPath WTF_GUARDED_BY_LOCK(m_lock);
     Vector<IntRect, 1> m_dirtyRegion WTF_GUARDED_BY_LOCK(m_lock);
     FilterOperations m_filters WTF_GUARDED_BY_LOCK(m_lock);
     RefPtr<CoordinatedPlatformLayer> m_mask WTF_GUARDED_BY_LOCK(m_lock);

@@ -41,6 +41,7 @@ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <skia/core/SkCanvas.h>
 #include <skia/core/SkColorFilter.h>
 #include <skia/core/SkM44.h>
+#include <skia/core/SkPath.h>
 #include <skia/effects/SkImageFilters.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 #include <wtf/MonotonicTime.h>
@@ -78,6 +79,7 @@ public:
     void setContentsRect(const FloatRect& rect) { m_contentsRect = rect; }
     void setAnimations(const TextureMapperAnimations& animations) { m_animations = animations; }
     void setContentsTiling(const FloatSize& size, const FloatSize& phase) { m_contentsTiling = { size, phase }; }
+    void setClipPath(SkPath&& clipPath) { m_clipPath = WTF::move(clipPath); }
     void setMask(RefPtr<SkiaCompositingLayer>&&);
     void setReplica(RefPtr<SkiaCompositingLayer>&&);
     void setFilters(const FilterOperations&);
@@ -210,6 +212,7 @@ private:
     bool m_contentsRectClipsDescendants { false };
     FloatRoundedRect m_contentsClippingRect;
     float m_opacity { 1 };
+    SkPath m_clipPath;
     RefPtr<SkiaCompositingLayer> m_mask;
     RefPtr<SkiaCompositingLayer> m_replica;
     WeakPtr<SkiaCompositingLayer> m_replicatedLayer;

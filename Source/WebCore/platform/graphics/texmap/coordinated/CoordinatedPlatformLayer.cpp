@@ -715,6 +715,14 @@ const EventRegion& CoordinatedPlatformLayer::eventRegion() const
     return m_eventRegion;
 }
 
+void CoordinatedPlatformLayer::setClipPath(const Path& path, WindRule windRule)
+{
+    ASSERT(m_lock.isHeld());
+    m_clipPath.path = path;
+    m_clipPath.windRule = windRule;
+    m_pendingChanges.add(Change::ClipPath);
+}
+
 void CoordinatedPlatformLayer::setDebugBorder(Color&& borderColor, float borderWidth)
 {
     ASSERT(m_lock.isHeld());
@@ -1250,6 +1258,11 @@ void CoordinatedPlatformLayer::flushCompositingStateOnSkiaTarget(const OptionSet
             m_pendingChanges.remove(Change::Damage);
         }
 #endif
+        if (m_pendingChanges.contains(Change::ClipPath)) {
+            auto clipPath = *m_clipPath.path.platformPath();
+            clipPath.setFillType(m_clipPath.windRule == WindRule::EvenOdd ? SkPathFillType::kEvenOdd : SkPathFillType::kWinding);
+            layer.setClipPath(WTF::move(clipPath));
+        }
 
         if (m_pendingChanges.contains(Change::Filters)) {
             layer.setFilters(m_filters);

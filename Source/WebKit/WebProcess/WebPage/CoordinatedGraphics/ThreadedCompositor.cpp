@@ -61,15 +61,6 @@ using namespace WebCore;
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(ThreadedCompositor);
 
-static bool useSkia(WebPage& webPage)
-{
-    if (webPage.corePage()->settings().useSkiaForComposition())
-        return true;
-
-    static auto envValue = String::fromLatin1(getenv("WEBKIT_USE_SKIA_FOR_COMPOSITION"));
-    return !envValue.isEmpty() && envValue != "0"_s;
-}
-
 Ref<ThreadedCompositor> ThreadedCompositor::create(WebPage& webPage, LayerTreeHost& layerTreeHost, CoordinatedSceneState& sceneState)
 {
     return adoptRef(*new ThreadedCompositor(webPage, layerTreeHost, sceneState));
@@ -78,7 +69,7 @@ Ref<ThreadedCompositor> ThreadedCompositor::create(WebPage& webPage, LayerTreeHo
 ThreadedCompositor::ThreadedCompositor(WebPage& webPage, LayerTreeHost& layerTreeHost, CoordinatedSceneState& sceneState)
     : m_workQueue(WorkQueue::create("org.webkit.ThreadedCompositor"_s))
     , m_layerTreeHost(&layerTreeHost)
-    , m_useSkia(useSkia(webPage))
+    , m_useSkia(webPage.corePage()->settings().useSkiaForComposition())
     , m_surface(AcceleratedSurface::create(webPage, [this] { frameComplete(); }, AcceleratedSurface::RenderingPurpose::Composited, m_useSkia))
     , m_sceneState(&sceneState)
     , m_flipY(m_surface->shouldPaintMirrored())

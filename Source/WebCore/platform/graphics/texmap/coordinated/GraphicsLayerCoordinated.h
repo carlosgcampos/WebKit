@@ -97,6 +97,9 @@ private:
 
     void setEventRegion(EventRegion&&) override;
 
+    void setShapeLayerPath(const Path&) override;
+    void setShapeLayerWindRule(WindRule) override;
+
     void deviceOrPageScaleFactorChanged() override;
 
     float rootRelativeScaleFactor() const { return m_rootRelativeScaleFactor; }
@@ -153,17 +156,18 @@ private:
         ContentsColor                = 1LLU << 19,
         DirtyRegion                  = 1LLU << 20,
         EventRegion                  = 1LLU << 21,
-        Filters                      = 1LLU << 22,
-        Mask                         = 1LLU << 23,
-        Replica                      = 1LLU << 24,
-        Backdrop                     = 1LLU << 25,
-        BackdropRect                 = 1LLU << 26,
-        BackdropRoot                 = 1LLU << 27,
-        Animations                   = 1LLU << 28,
-        TileCoverage                 = 1LLU << 29,
-        DebugIndicators              = 1LLU << 30,
+        Shape                        = 1LLU << 22,
+        Filters                      = 1LLU << 23,
+        Mask                         = 1LLU << 24,
+        Replica                      = 1LLU << 25,
+        Backdrop                     = 1LLU << 26,
+        BackdropRect                 = 1LLU << 27,
+        BackdropRoot                 = 1LLU << 28,
+        Animations                   = 1LLU << 29,
+        TileCoverage                 = 1LLU << 30,
+        DebugIndicators              = 1LLU << 31,
 #if ENABLE(SCROLLING_THREAD)
-        ScrollingNode                = 1LLU << 31
+        ScrollingNode                = 1LLU << 32
 #endif
     };
 
